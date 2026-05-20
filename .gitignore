@@ -1,0 +1,41 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/  
+
+# Environments
+venv/
+env/
+.venv/
+
+# Sensitive Information (API Keys, Passwords)
+.env
+
+# Python Cache & Compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# AI/ML Model files (if you have heavy local models)
+*.pt
+*.pth
+*.onnx
+*.safetensors
+
+# OS Generated Files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,37 @@
+[project]
+name = "stepo-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+	"python-dotenv",
+	"django",
+	"djangorestframework",
+	"httpx",
+	"reportlab",
+	"svglib",
+	"drf-spectacular",
+	"stripe",
+	"pyjwt",
+	"pandas",
+	"openai",
+	"django-cors-headers",
+	"openpyxl",
+	"django-cleanup",
+	"deep-translator",
+	"google-generativeai",
+	"numpy",
+	"pandas",
+	"tqdm",
+	"tiktoken",
+	"openai",
+	"fuzzywuzzy",
+	"sentence-transformers",
+	"pinecone-client",
+	"langchain-openai",
+	"python-dotenv",
+	"langchain-pinecone",
+	"deep-translator",
+	"python-Levenshtein",
+]
