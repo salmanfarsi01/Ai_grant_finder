@@ -48,6 +48,421 @@ def get_active_index():
     return pc.Index(INDEX_NAME)
 
 index = pc.Index(INDEX_NAME)
+MUNICIPALITY_NAME_MAP = {
+    # English/Normalized → Swedish (exact database value)
+    "ale": "Ale",
+    "alingsas": "Alingsås",
+    "alingsås": "Alingsås",
+    "alvesta": "Alvesta",
+    "aneby": "Aneby",
+    "arboga": "Arboga",
+    "arjeplog": "Arjeplog",
+    "arvidsjaur": "Arvidsjaur",
+    "arvika": "Arvika",
+    "askersund": "Askersund",
+    "avesta": "Avesta",
+    "bengtsfors": "Bengtsfors",
+    "berg": "Berg",
+    "bjurholm": "Bjurholm",
+    "bjuv": "Bjuv",
+    "boden": "Boden",
+    "bollebygd": "Bollebygd",
+    "bollnas": "Bollnäs",
+    "bollnäs": "Bollnäs",
+    "borgholm": "Borgholm",
+    "borlange": "Borlänge",
+    "borlänge": "Borlänge",
+    "boras": "Borås",
+    "borås": "Borås",
+    "botkyrka": "Botkyrka",
+    "boxholm": "Boxholm",
+    "bromolla": "Bromölla",
+    "bromölla": "Bromölla",
+    "bracke": "Bräcke",
+    "bräcke": "Bräcke",
+    "burlov": "Burlöv",
+    "burlöv": "Burlöv",
+    "bastad": "Båstad",
+    "båstad": "Båstad",
+    "dals-ed": "Dals-Ed",
+    "danderyd": "Danderyd",
+    "degerfors": "Degerfors",
+    "dorotea": "Dorotea",
+    "eda": "Eda",
+    "ekero": "Ekerö",
+    "ekerö": "Ekerö",
+    "eksjo": "Eksjö",
+    "eksjö": "Eksjö",
+    "emmaboda": "Emmaboda",
+    "enkoping": "Enköping",
+    "enköping": "Enköping",
+    "eskilstuna": "Eskilstuna",
+    "eslov": "Eslöv",
+    "eslöv": "Eslöv",
+    "essunga": "Essunga",
+    "fagersta": "Fagersta",
+    "falkenberg": "Falkenberg",
+    "falkoping": "Falköping",
+    "falköping": "Falköping",
+    "falun": "Falun",
+    "filipstad": "Filipstad",
+    "finspang": "Finspång",
+    "finspång": "Finspång",
+    "flen": "Flen",
+    "forshaga": "Forshaga",
+    "fargelanda": "Färgelanda",
+    "färgelanda": "Färgelanda",
+    "gagnef": "Gagnef",
+    "gislaved": "Gislaved",
+    "gnesta": "Gnesta",
+    "gnosjo": "Gnosjö",
+    "gnosjö": "Gnosjö",
+    "gotland": "Gotland",
+    "grums": "Grums",
+    "grastorp": "Grästorp",
+    "grästorp": "Grästorp",
+    "gullspang": "Gullspång",
+    "gullspång": "Gullspång",
+    "gallivare": "Gällivare",
+    "gällivare": "Gällivare",
+    "gavle": "Gävle",
+    "gävle": "Gävle",
+    "gotene": "Götene",
+    "götene": "Götene",
+    "gothenburg": "Göteborg",
+    "goteborg": "Göteborg",
+    "göteborg": "Göteborg",
+    "habo": "Habo",
+    "hagfors": "Hagfors",
+    "hallsberg": "Hallsberg",
+    "hallstahammar": "Hallstahammar",
+    "halmstad": "Halmstad",
+    "hammaro": "Hammarö",
+    "hammarö": "Hammarö",
+    "haninge": "Haninge",
+    "haparanda": "Haparanda",
+    "heby": "Heby",
+    "hedemora": "Hedemora",
+    "helsingborg": "Helsingborg",
+    "herrljunga": "Herrljunga",
+    "hjo": "Hjo",
+    "hofors": "Hofors",
+    "huddinge": "Huddinge",
+    "hudiksvall": "Hudiksvall",
+    "hultsfred": "Hultsfred",
+    "hylte": "Hylte",
+    "habo": "Habo", 
+    "håbo": "Håbo", 
+    "hallefors": "Hällefors",
+    "hällefors": "Hällefors",
+    "harjedalen": "Härjedalen",
+    "härjedalen": "Härjedalen",
+    "harnosand": "Härnösand",
+    "härnösand": "Härnösand",
+    "harryda": "Härryda",
+    "härryda": "Härryda",
+    "hassleholm": "Hässleholm",
+    "hässleholm": "Hässleholm",
+    "hoganas": "Höganäs",
+    "höganäs": "Höganäs",
+    "hogsby": "Högsby",
+    "högsby": "Högsby",
+    "horby": "Hörby",
+    "hörby": "Hörby",
+    "hoor": "Höör",
+    "höör": "Höör",
+    "jokkmokk": "Jokkmokk",
+    "jarfalla": "Järfälla",
+    "järfälla": "Järfälla",
+    "jonkoping": "Jönköping",
+    "jönköping": "Jönköping",
+    "kalix": "Kalix",
+    "kalmar": "Kalmar",
+    "karlsborg": "Karlsborg",
+    "karlshamn": "Karlshamn",
+    "karlskoga": "Karlskoga",
+    "karlskrona": "Karlskrona",
+    "karlstad": "Karlstad",
+    "katrineholm": "Katrineholm",
+    "kil": "Kil",
+    "kinda": "Kinda",
+    "kiruna": "Kiruna",
+    "klippan": "Klippan",
+    "knivsta": "Knivsta",
+    "kramfors": "Kramfors",
+    "kristianstad": "Kristianstad",
+    "kristinehamn": "Kristinehamn",
+    "krokom": "Krokom",
+    "kumla": "Kumla",
+    "kungsbacka": "Kungsbacka",
+    "kungsor": "Kungsör",
+    "kungsör": "Kungsör",
+    "kungalv": "Kungälv",
+    "kungälv": "Kungälv",
+    "kavlinge": "Kävlinge",
+    "kävlinge": "Kävlinge",
+    "koping": "Köping",
+    "köping": "Köping",
+    "laholm": "Laholm",
+    "laxa": "Laxå",
+    "laxå": "Laxå",
+    "lekeberg": "Lekeberg",
+    "leksand": "Leksand",
+    "lerum": "Lerum",
+    "lessebo": "Lessebo",
+    "lidingo": "Lidingö",
+    "lidingö": "Lidingö",
+    "lidkoping": "Lidköping",
+    "lidköping": "Lidköping",
+    "lilla edet": "Lilla Edet",
+    "lindesberg": "Lindesberg",
+    "linkoping": "Linköping",
+    "linköping": "Linköping",
+    "ljungby": "Ljungby",
+    "ljusdal": "Ljusdal",
+    "ljusnarsberg": "Ljusnarsberg",
+    "lomma": "Lomma",
+    "ludvika": "Ludvika",
+    "lulea": "Luleå",
+    "luleå": "Luleå",
+    "lund": "Lund",
+    "lycksele": "Lycksele",
+    "lysekil": "Lysekil",
+    "malmo": "Malmö",
+    "malmö": "Malmö",
+    "malung-salen": "Malung-Sälen",
+    "malung-sälen": "Malung-Sälen",
+    "mala": "Malå",
+    "malå": "Malå",
+    "mariestad": "Mariestad",
+    "mark": "Mark",
+    "markaryd": "Markaryd",
+    "mellerud": "Mellerud",
+    "mjolby": "Mjölby",
+    "mjölby": "Mjölby",
+    "mora": "Mora",
+    "motala": "Motala",
+    "munkedal": "Munkedal",
+    "munkfors": "Munkfors",
+    "molndal": "Mölndal",
+    "mölndal": "Mölndal",
+    "monsteras": "Mönsterås",
+    "mönsterås": "Mönsterås",
+    "morbylanga": "Mörbylånga",
+    "mörbylånga": "Mörbylånga",
+    "nacka": "Nacka",
+    "nora": "Nora",
+    "norberg": "Norberg",
+    "nordanstig": "Nordanstig",
+    "nordmaling": "Nordmaling",
+    "norrkoping": "Norrköping",
+    "norrköping": "Norrköping",
+    "norrtalje": "Norrtälje",
+    "norrtälje": "Norrtälje",
+    "norsjo": "Norsjö",
+    "norsjö": "Norsjö",
+    "nybro": "Nybro",
+    "nykvarn": "Nykvarn",
+    "nykoping": "Nyköping",
+    "nyköping": "Nyköping",
+    "nynashamn": "Nynäshamn",
+    "nynäshamn": "Nynäshamn",
+    "nassjo": "Nässjö",
+    "nässjö": "Nässjö",
+    "ockelbo": "Ockelbo",
+    "olofstrom": "Olofström",
+    "olofström": "Olofström",
+    "orsa": "Orsa",
+    "orust": "Orust",
+    "osby": "Osby",
+    "oskarshamn": "Oskarshamn",
+    "ovanaker": "Ovanåker",
+    "ovanåker": "Ovanåker",
+    "oxelosund": "Oxelösund",
+    "oxelösund": "Oxelösund",
+    "pajala": "Pajala",
+    "partille": "Partille",
+    "perstorp": "Perstorp",
+    "pitea": "Piteå",
+    "piteå": "Piteå",
+    "ragunda": "Ragunda",
+    "robertsfors": "Robertsfors",
+    "ronneby": "Ronneby",
+    "rattvik": "Rättvik",
+    "rättvik": "Rättvik",
+    "sala": "Sala",
+    "salem": "Salem",
+    "sandviken": "Sandviken",
+    "sigtuna": "Sigtuna",
+    "simrishamn": "Simrishamn",
+    "sjobo": "Sjöbo",
+    "sjöbo": "Sjöbo",
+    "skara": "Skara",
+    "skelleftea": "Skellefteå",
+    "skellefteå": "Skellefteå",
+    "skinnskatteberg": "Skinnskatteberg",
+    "skurup": "Skurup",
+    "skovde": "Skövde",
+    "skövde": "Skövde",
+    "smedjebacken": "Smedjebacken",
+    "solleftea": "Sollefteå",
+    "sollefteå": "Sollefteå",
+    "sollentuna": "Sollentuna",
+    "solna": "Solna",
+    "sorsele": "Sorsele",
+    "sotenas": "Sotenäs",
+    "sotenäs": "Sotenäs",
+    "staffanstorp": "Staffanstorp",
+    "stenungsund": "Stenungsund",
+    "stockholm": "Stockholm",
+    "storfors": "Storfors",
+    "storuman": "Storuman",
+    "strangnas": "Strängnäs",
+    "strängnäs": "Strängnäs",
+    "stromstad": "Strömstad",
+    "strömstad": "Strömstad",
+    "stromsund": "Strömsund",
+    "strömsund": "Strömsund",
+    "sundbyberg": "Sundbyberg",
+    "sundsvall": "Sundsvall",
+    "sunne": "Sunne",
+    "surahammar": "Surahammar",
+    "svalov": "Svalöv",
+    "svalöv": "Svalöv",
+    "svedala": "Svedala",
+    "svenljunga": "Svenljunga",
+    "saffle": "Säffle",
+    "säffle": "Säffle",
+    "sater": "Säter",
+    "säter": "Säter",
+    "savsjo": "Sävsjö",
+    "sävsjö": "Sävsjö",
+    "solvesborg": "Sölvesborg",
+    "sölvesborg": "Sölvesborg",
+    "tanum": "Tanum",
+    "tibro": "Tibro",
+    "tidaholm": "Tidaholm",
+    "tierp": "Tierp",
+    "timra": "Timrå",
+    "timrå": "Timrå",
+    "tingsryd": "Tingsryd",
+    "tjorn": "Tjörn",
+    "tjörn": "Tjörn",
+    "tomelilla": "Tomelilla",
+    "torsby": "Torsby",
+    "torsas": "Torsås",
+    "torsås": "Torsås",
+    "tranemo": "Tranemo",
+    "tranas": "Tranås",
+    "tranås": "Tranås",
+    "trelleborg": "Trelleborg",
+    "trollhattan": "Trollhättan",
+    "trollhättan": "Trollhättan",
+    "trosa": "Trosa",
+    "tyreso": "Tyresö",
+    "tyresö": "Tyresö",
+    "taby": "Täby",
+    "täby": "Täby",
+    "toreboda": "Töreboda",
+    "töreboda": "Töreboda",
+    "uddevalla": "Uddevalla",
+    "ulricehamn": "Ulricehamn",
+    "umea": "Umeå",
+    "umeå": "Umeå",
+    "upplands-bro": "Upplands-Bro",
+    "upplands vasby": "Upplands Väsby",
+    "upplands väsby": "Upplands Väsby",
+    "uppsala": "Uppsala",
+    "uppvidinge": "Uppvidinge",
+    "vadstena": "Vadstena",
+    "vaggeryd": "Vaggeryd",
+    "valdemarsvik": "Valdemarsvik",
+    "vallentuna": "Vallentuna",
+    "vansbro": "Vansbro",
+    "vara": "Vara",
+    "varberg": "Varberg",
+    "vaxholm": "Vaxholm",
+    "vellinge": "Vellinge",
+    "vetlanda": "Vetlanda",
+    "vilhelmina": "Vilhelmina",
+    "vimmerby": "Vimmerby",
+    "vindeln": "Vindeln",
+    "vingaker": "Vingåker",
+    "vingåker": "Vingåker",
+    "vanersborg": "Vänersborg",
+    "vänersborg": "Vänersborg",
+    "vannas": "Vännäs",
+    "vännäs": "Vännäs",
+    "vasteras": "Västerås",
+    "västerås": "Västerås",
+    "vaxjo": "Växjö",
+    "växjö": "Växjö",
+    "vargarda": "Vårgårda",
+    "vårgårda": "Vårgårda",
+    "ydre": "Ydre",
+    "ystad": "Ystad",
+    "amal": "Åmål",
+    "åmål": "Åmål",
+    "ange": "Ånge",
+    "ånge": "Ånge",
+    "are": "Åre",
+    "åre": "Åre",
+    "arjang": "Årjäng",
+    "årjäng": "Årjäng",
+    "asele": "Åsele",
+    "åsele": "Åsele",
+    "astorp": "Åstorp",
+    "åstorp": "Åstorp",
+    "atvidaberg": "Åtvidaberg",
+    "åtvidaberg": "Åtvidaberg",
+    "almhult": "Älmhult",
+    "älmhult": "Älmhult",
+    "alvdalen": "Älvdalen",
+    "älvdalen": "Älvdalen",
+    "alvkarleby": "Älvkarleby",
+    "älvkarleby": "Älvkarleby",
+    "alvsbyn": "Älvsbyn",
+    "älvsbyn": "Älvsbyn",
+    "angelholm": "Ängelholm",
+    "ängelholm": "Ängelholm",
+    "ockero": "Öckerö",
+    "öckerö": "Öckerö",
+    "odeshog": "Ödeshög",
+    "ödeshög": "Ödeshög",
+    "orebro": "Örebro",
+    "örebro": "Örebro",
+    "orkelljunga": "Örkelljunga",
+    "örkelljunga": "Örkelljunga",
+    "ornskoldsvik": "Örnsköldsvik",
+    "örnsköldsvik": "Örnsköldsvik",
+    "ostersund": "Östersund",
+    "östersund": "Östersund",
+    "osteraker": "Österåker",
+    "österåker": "Österåker",
+    "osthammar": "Östhammar",
+    "östhammar": "Östhammar",
+    "ostra goinge": "Östra Göinge",
+    "östra göinge": "Östra Göinge",
+    "landskrona": "Landskrona", 
+    "mullsjo": "Mullsjö", 
+    "mullsjö": "Mullsjö", 
+    "varmdo": "Värmdö", 
+    "värmdö": "Värmdö", 
+    "varnamo": "Värnamo", 
+    "värnamo": "Värnamo", 
+    "vastervik": "Västervik", 
+    "västervik": "Västervik", 
+    "overkalix": "Överkalix", 
+    "överkalix": "Överkalix", 
+    "overtornea": "Övertorneå", 
+    "övertorneå": "Övertorneå", 
+    "sodertalje": "Södertälje", 
+    "södertälje": "Södertälje", 
+    "soderkoping": "Söderköping", 
+    "söderköping": "Söderköping", 
+    "soderhamn": "Söderhamn", 
+    "söderhamn": "Söderhamn",
+}
 FIELD_MAP_SV = {
     "Name": "Namn",
     "Purpose": "Ändamål",
@@ -636,6 +1051,17 @@ def contains_any_stem(text: str, terms: List[str], min_stem_len: int = 6) -> boo
             if stem in t:
                 return True
     return False
+def resolve_municipality(municipality: str) -> str:
+    """
+    Maps any municipality input — English name, Swedish name,
+    any casing — to the exact Swedish value stored in Pinecone.
+    Returns the original string unchanged if no mapping found,
+    so existing correct Swedish inputs are never broken.
+    """
+    if not municipality:
+        return municipality
+    key = municipality.strip().lower()
+    return MUNICIPALITY_NAME_MAP.get(key, municipality.strip())
 
 
 def match_tech_terms_word_boundary(text: str, terms: List[str]) -> List[str]:
@@ -1032,30 +1458,21 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
     name = normalize_text(str(sch.get("Name", "")))
     user_domain = get_user_domain(user_purpose)
 
-    purpose_only = scholarship_purpose_text(sch)
-
-    if user_domain == "law" and is_law_relevant(purpose_only):
-        return False, ""
-    if user_domain == "business" and contains_any(purpose_only, BUSINESS_TERMS):
-        return False, ""
-    if user_domain == "technology":
-        
-        if contains_any(purpose_only, TECHNOLOGY_TERMS):
-           
-            purpose_is_primarily_business = (
-                contains_any(purpose_only, BUSINESS_TERMS)
-                and not any(t in purpose_only for t in [
-                    "ingenjör", "engineering", "teknik", "datateknik",
-                    "maskinteknik", "elektroteknik", "civilingenjör",
-                    "computer science", "mjukvara", "software",
-                ])
-            )
-            if not purpose_is_primarily_business:
-                return False, ""
-        
-    if user_domain == "medical" and contains_any(purpose_only, MEDICAL_TERMS):
-        return False, ""
-
+    # MASTER DOMAIN SAFE HARBOR — only exit early if scholarship also has
+    # direct scholarship language. Institutional funds have domain terms
+    # but never contain stipendium/bidrag/ansökan etc.
+    if user_domain == "law" and is_law_relevant(excl_text):
+        if contains_any(excl_text, STRONG_DIRECT_SCHOLARSHIP_TERMS):
+            return False, ""
+    if user_domain == "business" and contains_any(excl_text, BUSINESS_TERMS):
+        if contains_any(excl_text, STRONG_DIRECT_SCHOLARSHIP_TERMS):
+            return False, ""
+    if user_domain == "technology" and contains_any(excl_text, TECHNOLOGY_TERMS):
+        if contains_any(excl_text, STRONG_DIRECT_SCHOLARSHIP_TERMS):
+            return False, ""
+    if user_domain == "medical" and contains_any(excl_text, MEDICAL_TERMS):
+        if contains_any(excl_text, STRONG_DIRECT_SCHOLARSHIP_TERMS):
+            return False, ""
 
     if user_domain == "law":
 
@@ -1065,18 +1482,15 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
             "samhällsvetenskaplig och teknisk",
         ]
         if not contains_any(excl_text, tech_cross_domain_safe):
-
             strong_tech_matches = match_tech_terms_word_boundary(excl_text, STRONG_TECH_SINGLE_MATCH_TERMS)
             if strong_tech_matches:
                 return True, f"strong tech/engineering domain for law user (matched: {strong_tech_matches[:3]})"
 
-        # Tier 2 — general tech terms, require 2+ matches
         tech_general_matches = get_matched_terms(excl_text, TECHNOLOGY_TERMS)
         if len(tech_general_matches) >= 2:
             if not contains_any(excl_text, LAW_TERMS):
                 return True, f"tech/engineering domain for law user ({len(tech_general_matches)} matches: {tech_general_matches[:3]})"
 
-        # Medical explicit check
         medical_matches = get_matched_terms(excl_text, MEDICAL_EXPLICIT_TERMS)
         if medical_matches:
             if not contains_any(excl_text, LAW_TERMS):
@@ -1105,10 +1519,16 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
             if not contains_any(excl_text, TECHNOLOGY_TERMS):
                 return True, f"explicit medical domain for technology user (matched: {medical_matches[:5]})"
 
+    # ============================================================
+    # CHECK 1: Institution Support (Rule 2)
+    # ============================================================
     is_inst, inst_reason = _is_institution_support(sch, user_purpose)
     if is_inst:
         return True, inst_reason
 
+    # ============================================================
+    # CHECK 2: Wrong Educational Level (Rule 4)
+    # ============================================================
     below_university_only_terms = [
         "elev i grundskolan", "grundskolan",
         "grundskoleelev", "grundskoleelever",
@@ -1119,7 +1539,6 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
         "läroverket", "läroverk",
         "abiturient",
     ]
-
     name_school_patterns = [
         "skolfond", "skolas stipendiestiftelse", "skolas samfond",
         "skolans stipendie", "skolans fond",
@@ -1148,25 +1567,29 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
             matched = get_matched_terms(name, name_school_patterns)
             return True, f"below university level only (school name pattern: {matched})"
 
-
     if contains_any(excl_text, gymnasium_only_terms):
         if not contains_any(excl_text, university_pathway_terms):
             matched = get_matched_terms(excl_text, gymnasium_only_terms)
             return True, f"gymnasium only with no university pathway (matched: {matched})"
 
+    # ============================================================
+    # CHECK 2.5: Entrepreneurship Support Exclusion
+    # ============================================================
     user_text = normalize_text(user_purpose)
     if not contains_any(user_text, ["entrepren", "startup", "drivhus", "inkubat"]):
         if contains_any(excl_text, ENTREPRENEURSHIP_SUPPORT_TERMS):
             matched = get_matched_terms(excl_text, ENTREPRENEURSHIP_SUPPORT_TERMS)
             return True, f"entrepreneurship support (matched: {matched})"
 
+    # ============================================================
+    # CHECK 3: Domain mismatch — STANDARD PATH
+    # ============================================================
     has_scholarship_terms = contains_any(excl_text, STRONG_DIRECT_SCHOLARSHIP_TERMS)
 
+    # LAW USER
     if user_domain == "law":
-
         is_domain_scholarship = is_law_relevant(excl_text)
         if not is_domain_scholarship:
-
             non_law_matches = get_matched_terms(excl_text, NON_LAW_DOMAIN_TERMS)
             if len(non_law_matches) >= 2:
                 matched = get_matched_terms(excl_text, NON_LAW_DOMAIN_TERMS)
@@ -1189,6 +1612,7 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
                 matched = get_matched_terms(excl_text, off_topic_single_terms)
                 return True, f"off-topic subject for law user (matched: {matched[:3]})"
 
+    # BUSINESS USER
     if user_domain == "business":
         if contains_any(excl_text, LAW_TERMS) and not contains_any(excl_text, BUSINESS_TERMS):
             if _is_domain_specific(excl_text, LAW_TERMS):
@@ -1205,30 +1629,15 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
                     matched = get_matched_terms(excl_text, NON_BUSINESS_DOMAIN_TERMS)
                     return True, f"non-business domain mismatch - primary domain (matched: {matched})"
 
+    # TECHNOLOGY USER
     if user_domain == "technology":
-       
-        specific_non_tech = ["industriell ekonomi", "teknisk ekonomi", "industrial economics", "business economics"]
-        if contains_any(excl_text, specific_non_tech):
-            if _is_domain_specific(excl_text, specific_non_tech):
-                if not has_scholarship_terms:
-                    matched = get_matched_terms(excl_text, specific_non_tech)
-                    return True, f"non-tech economics domain for tech user (matched: {matched})"
-        
-       
         if contains_any(excl_text, NON_TECH_DOMAIN_TERMS) and not contains_any(excl_text, TECHNOLOGY_TERMS):
             if _is_domain_specific(excl_text, NON_TECH_DOMAIN_TERMS):
                 if not has_scholarship_terms:
                     matched = get_matched_terms(excl_text, NON_TECH_DOMAIN_TERMS)
                     return True, f"non-tech domain mismatch (matched: {matched})"
-        elif contains_any(excl_text, NON_TECH_DOMAIN_TERMS) and contains_any(excl_text, TECHNOLOGY_TERMS):
-            
-            non_tech_count = count_matches(excl_text, NON_TECH_DOMAIN_TERMS)
-            tech_count = count_matches(excl_text, TECHNOLOGY_TERMS)
-            if non_tech_count > tech_count:
-                if _is_domain_specific(excl_text, NON_TECH_DOMAIN_TERMS):
-                    matched = get_matched_terms(excl_text, NON_TECH_DOMAIN_TERMS)
-                    return True, f"non-tech domain dominant over tech ({non_tech_count}>{tech_count}, matched: {matched})"
 
+    # MEDICAL USER
     if user_domain == "medical":
         non_med_explicit = [
             "juridik", "juridisk", "juridiska", "affärsjuridik",
@@ -1254,6 +1663,7 @@ def should_exclude_entity_type(sch: Dict, user_purpose: str) -> Tuple[bool, str]
                     return True, f"non-medical domain mismatch ({non_med_count} matches: {matched[:5]})"
 
     return False, ""
+
 
 
 def should_exclude_study_level_mismatch(sch: Dict, user_purpose: str) -> Tuple[bool, str]:
@@ -1305,6 +1715,35 @@ def should_exclude_study_level_mismatch(sch: Dict, user_purpose: str) -> Tuple[b
             return True, f"undergrad-only scholarship for research user (matched: {matched})"
 
         return False, ""
+
+    return False, ""
+
+def should_exclude_gender_mismatch(sch: Dict, gender: str) -> Tuple[bool, str]:
+    if not gender:
+        return False, ""
+
+    excl_text = _exclusion_purpose_text(sch)
+
+    FEMALE_ONLY_TERMS = [
+        "kvinnlig", "kvinnliga", "kvinna", "kvinnor",
+        "för kvinnor", "only for women", "female only",
+        "damer", "damernas",
+    ]
+    MALE_ONLY_TERMS = [
+        "manlig", "manliga", "för män", "för man",
+        "only for men", "male only",
+        "herrar", "herrarna",
+    ]
+
+    if gender.lower() == "male":
+        matched = get_matched_terms(excl_text, FEMALE_ONLY_TERMS)
+        if matched:
+            return True, f"female-only scholarship for male user (matched: {matched})"
+
+    elif gender.lower() == "female":
+        matched = get_matched_terms(excl_text, MALE_ONLY_TERMS)
+        if matched:
+            return True, f"male-only scholarship for female user (matched: {matched})"
 
     return False, ""
 
@@ -1510,6 +1949,14 @@ ALWAYS EXCLUDE these regardless of anything else:
   - Scholarships requiring active university enrollment as individual
   - Scholarships exclusively for study trips abroad by individuals
   - Scholarships for individual artistic education (music, violin, art)
+  - Scholarships tied to a specific named school's graduating class
+  - Foundations whose PRIMARY purpose is environmental sustainability,
+    climate, natural resources, or social development causes AND have
+    no mention of sport, idrott, kultur, or the user's activity area
+  - Any foundation where the core mission has zero overlap with the
+    user's stated activity — if the user mentions a sport, exclude
+    foundations that are entirely about a different field with no
+    possible connection to that sport or physical activity
   - Scholarships tied to a specific named school's graduating class{gender_rule}
 
 ===============================================
@@ -1669,7 +2116,25 @@ STUDY LEVEL RULES FOR RESEARCHER USER:
 STUDY LEVEL RULES FOR UNSPECIFIED USER:
   Treat all study levels as eligible.
   Include scholarships for students, researchers, and mixed purposes.
-  Only exclude clearly wrong-domain scholarships."""
+  Only exclude clearly wrong-domain scholarships.
+
+INSTITUTIONAL FUND RULE:
+  EXCLUDE scholarships that primarily fund research infrastructure,
+  institutional operations, or academic department activities
+  AND have no direct personal application pathway for individuals.
+
+  Signals that confirm INSTITUTIONAL (→ EXCLUDE):
+    - "att skapa en institution", "institutionens verksamhet"
+    - "främja forskning" or "stödja forskning" as the SOLE purpose
+    - "jubileumsfond" funding research rather than student stipendier
+    - No mention of ansökan, sökande, or individual application
+    - No explicit amount per recipient or number of recipients
+    - Purpose describes supporting the institution itself, not students at it
+
+  INCLUDE if the scholarship also contains:
+    - stipendium, stipendier, bidrag, scholarship, grant
+    - ansökan, sökande, apply
+    - explicit recipient count or amount per person"""
 
 
     domain_rules = {
@@ -1734,6 +2199,14 @@ STUDY LEVEL RULES FOR UNSPECIFIED USER:
 
 USER PURPOSE: "{user_purpose}"
 STUDY LEVEL CONTEXT: {study_level_context}
+{f'''
+GENDER RULE — APPLY BEFORE ANYTHING ELSE
+{gender_rule.strip()}
+Any scholarship with an explicit gender restriction that does not
+match the user MUST be marked irrelevant. This overrides all other rules.
+Check every scholarship for "kvinnlig", "kvinnliga", "manlig", "manliga"
+before evaluating domain or level.
+''' if gender_rule else ''}
 
 ===============================================
 STEP 1 -- SUBJECT + STUDY LEVEL MATCH (Highest Priority)
@@ -1779,7 +2252,7 @@ INCLUDE these even if they mention research:
   - Direct scholarships/stipendier to named student groups
   - Generic university scholarships open to all students
   - Business school student funds
-  - Research grants and forskarstipendier (for research users){gender_rule}
+  - Research grants and forskarstipendier (for research users)
 
 ===============================================
 STEP 4 -- DOUBT RULE
@@ -1893,11 +2366,24 @@ Return ONLY a JSON array -- no text, no markdown:
         return scholarships
 
 
-def rerank_with_llm(query, scholarships, oai_client, top_n=10, debug=True, user_type=None, custom_rerank_prompt=None):
+def rerank_with_llm(query, scholarships, oai_client, top_n=10, debug=True, user_type=None, custom_rerank_prompt=None, gender=None):
     is_undergrad = contains_any(query, UNDERGRAD_TERMS)
     _is_res_user = is_research_user(query)
     user_domain  = get_user_domain(query)
     is_org_user  = user_type and user_type.lower() in ["organization", "organisation", "idrottsförening"]
+
+    # Build gender_rule at top so all branches can access it
+    gender_rule = ""
+    if gender and gender.lower() == "male":
+        gender_rule = "User is male. Exclude scholarships explicitly for women only."
+    elif gender and gender.lower() == "female":
+        gender_rule = "User is female. Exclude scholarships explicitly for men only."
+
+    gender_instruction = (
+        f"GENDER RULE: {gender_rule}\n"
+        f"Any scholarship with a gender restriction not matching the user "
+        f"must be ranked absolutely last regardless of domain.\n\n"
+    ) if gender_rule else ""
 
     domain_configs = {
         "law": {
@@ -2053,7 +2539,10 @@ Within Tier 2, rank LOWER if:
   → Leans more toward individual language but not confirmed
   → Activity area is only loosely related to user's purpose
   → Geographic restriction reduces fit
+  → No mention of sport, idrott, or the user's specific activity area
 
+
+TIER 3 — MIXED OR UNCLEAR APPLICANT TYPE
 
 TIER 3 — MIXED OR UNCLEAR APPLICANT TYPE
 
@@ -2061,12 +2550,14 @@ Purpose is genuinely ambiguous. Cannot clearly confirm whether
 an organisation OR individual is the intended applicant.
 Not enough signals for Tier 1 or 2, but not clearly Tier 4 either.
 
-Tier 3 signals:
-  - Purpose mentions broad goals with no clear recipient specified
-  - Mentions individuals but ALSO implies organisational benefit
-  - Only one individual signal found (not enough for Tier 4)
-  - Scholarship could theoretically be interpreted either way
-  - Vague language that could include a förening with creative application
+Within Tier 3, rank HIGHER if:
+  → Activity area matches the user's stated purpose (sport, kultur etc.)
+  → Mentions any org-adjacent term loosely
+
+Within Tier 3, rank LOWER if:
+  → Activity area has no connection to user's stated purpose
+  → Purpose is about a completely different field (environment, 
+     sustainability, social causes) with no sport or activity link
 
 
 TIER 4 — INDIVIDUAL RECIPIENTS ONLY (show last)
@@ -2278,15 +2769,32 @@ FILL RULE:
                 f"Rank subject-specific direct scholarships first.\n\n"
             )
             tier_block = f"""
+AUTOMATIC DISQUALIFICATION — CHECK BEFORE ASSIGNING TIERS
+
+DISQUALIFICATION RULE — INSTITUTIONAL NOT PERSONAL:
+  If the scholarship primarily funds research infrastructure,
+  institutional operations, or academic department activities
+  AND does not describe a direct personal application pathway,
+  place it in TIER 3 (dead last).
+
+  Signals that confirm INSTITUTIONAL (→ Tier 3):
+    - "att skapa en institution", "institutionens verksamhet"
+    - "främja forskning" or "stödja forskning" as the SOLE purpose
+    - "jubileumsfond" funding research rather than student stipendier
+    - No mention of ansökan, sökande, or individual application
+    - No explicit amount per recipient or number of recipients
+  A domain term match alone does NOT save it from Tier 3.
+
 TIER 1 — {domain_label}-SPECIFIC DIRECT SCHOLARSHIPS:
   Contains any of: {subject_terms}
   Direct scholarship individual students apply to.
+  Must have: stipendium, bidrag, ansökan, or explicit recipient info.
 
 TIER 2 — GENERAL UNIVERSITY SCHOLARSHIPS:
   No subject restriction, open to any university student.
 
-TIER 3 — MIXED OR UNCLEAR:
-  Mixed purpose, unclear pathway, gymnasium level.
+TIER 3 — MIXED, UNCLEAR, OR INSTITUTIONAL:
+  Institutional funds, research foundations, unclear pathway.
 
 FILL RULE: Tier 1 first, Tier 2, Tier 3 last.
 """
@@ -2303,8 +2811,14 @@ FILL RULE: Tier 1 first, Tier 2, Tier 3 last.
                 f"  Step 3 — Tier 3: all remaining last.\n"
             )
 
+        gender_instruction = (
+            f"GENDER RULE: {gender_rule.strip()}\n"
+            f"Any scholarship with a gender restriction not matching the user "
+            f"must be ranked absolutely last regardless of domain.\n\n"
+        ) if gender_rule else ""
         prompt = (
             f"Rank these scholarships for the user query: \"{query}\".\n\n"
+            f"{gender_instruction}"
             f"{level_note}"
             f"{tier_block}\n"
             f"STEP-BY-STEP BEFORE YOU RESPOND:\n"
@@ -2312,6 +2826,7 @@ FILL RULE: Tier 1 first, Tier 2, Tier 3 last.
             f"Return ONLY a JSON array of 1-based positions: [3, 1, 2, ...]\n\n"
             f"Scholarships:\n{formatted}"
         )
+
 
   
     if custom_rerank_prompt:
@@ -2403,9 +2918,10 @@ def find_scholarships_v2(
         elif user_type_lower in ["organization", "organisation", "idrottsförening"]:
             filters["Kommentar"] = {"$in": ["Flera", "Idrottsförening"]}
  
+    # if municipality_filter and municipality:
+    #     filters["Kommun"] = municipality.strip()
     if municipality_filter and municipality:
-        filters["Kommun"] = municipality.strip()
- 
+        filters["Kommun"] = resolve_municipality(municipality)
     if debug:
         print(f"Pinecone Filters:\n{json.dumps(filters, indent=4, ensure_ascii=False)}\n")
  
@@ -2448,22 +2964,29 @@ def find_scholarships_v2(
     excluded_rules = []
  
     for sch in initial_list:
+        # Gender check runs first — cheapest, most reliable, domain-agnostic
+        if gender:
+            fail_gender, gender_reason = should_exclude_gender_mismatch(sch, gender)
+            if fail_gender:
+                excluded_rules.append((sch, gender_reason))
+                continue
+
         fail_entity, entity_reason = should_exclude_entity_type(sch, user_purpose)
         if fail_entity:
             excluded_rules.append((sch, entity_reason))
             continue
- 
+
         fail_research, research_reason = should_exclude_research_doctoral(sch, user_purpose)
         if fail_research:
             cls = classify_scholarship(sch)
             excluded_rules.append((sch, f"Research Mismatch [{cls}] - {research_reason}"))
             continue
- 
+
         fail_level, level_reason = should_exclude_study_level_mismatch(sch, user_purpose)
         if fail_level:
             excluded_rules.append((sch, f"Study Level Mismatch - {level_reason}"))
             continue
- 
+
         kept_rules.append(sch)
  
     if debug:
@@ -2504,7 +3027,7 @@ def find_scholarships_v2(
  
     if use_llm_rerank and len(final_data) > 1:
         final_data = rerank_with_llm(
-            user_purpose, final_data, openai_client, debug=debug, custom_rerank_prompt=custom_rerank_prompt, user_type=user_type
+            user_purpose, final_data, openai_client, debug=debug, custom_rerank_prompt=custom_rerank_prompt, user_type=user_type, gender=gender
         )
  
     if debug:
