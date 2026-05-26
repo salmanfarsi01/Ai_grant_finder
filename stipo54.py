@@ -132,7 +132,7 @@ MUNICIPALITY_NAME_MAP = {
     "gothenburg": "Göteborg",
     "goteborg": "Göteborg",
     "göteborg": "Göteborg",
-    "habo": "Habo",
+    #"habo": "Habo",
     "hagfors": "Hagfors",
     "hallsberg": "Hallsberg",
     "hallstahammar": "Hallstahammar",
@@ -2871,6 +2871,176 @@ FILL RULE: Tier 1 first, Tier 2, Tier 3 last.
 
 
 
+# def find_scholarships_v2(
+#     user_purpose,
+#     gender=None,
+#     top_k=DEFAULT_TOP_K,
+#     debug=True,
+#     use_llm_rerank=True,
+#     user_type=None,
+#     municipality_filter=False,
+#     municipality=None,
+#     custom_system_prompt=None,
+#     custom_rerank_prompt=None,
+# ):
+#     global index, INDEX_NAME
+    
+  
+#     try:
+#         from django.conf import settings
+#         if settings.SITE_CONFIG:
+#             INDEX_NAME = settings.SITE_CONFIG.get_active_dataset_index_name()
+#             index = pc.Index(INDEX_NAME)
+#     except Exception as e:
+#         if debug:
+#             print(f"Note: Using default index. Details: {e}")
+    
+#     _is_res_user = is_research_user(user_purpose)
+#     _is_ug_user = contains_any(user_purpose, UNDERGRAD_TERMS)
+ 
+#     if debug:
+#         print(f"\n{'#'*60}")
+#         print(f"# SEARCH: {user_purpose}")
+#         print(f"# Domain: {get_user_domain(user_purpose)}")
+#         print(f"# Undergrad: {_is_ug_user}")
+#         print(f"# Research User: {_is_res_user}")
+#         print(f"# Top-K: {top_k}")
+#         print(f"# User Type: {user_type or 'not specified'}")
+#         print(f"# Municipality Filter: {municipality_filter} | Municipality: {municipality or 'none'}")
+#         print(f"{'#'*60}")
+ 
+#     filters = {}
+ 
+#     if user_type:
+#         user_type_lower = user_type.lower()
+#         if user_type_lower in ["individual", "privatperson", "person"]:
+#             filters["Kommentar"] = {"$in": ["Flera", "Studier"]}
+#         elif user_type_lower in ["organization", "organisation", "idrottsförening"]:
+#             filters["Kommentar"] = {"$in": ["Flera", "Idrottsförening"]}
+ 
+#     # if municipality_filter and municipality:
+#     #     filters["Kommun"] = municipality.strip()
+#     if municipality_filter and municipality:
+#         filters["Kommun"] = resolve_municipality(municipality)
+#     if debug:
+#         print(f"Pinecone Filters:\n{json.dumps(filters, indent=4, ensure_ascii=False)}\n")
+ 
+#     emb_query = expand_user_query_for_embedding(user_purpose)
+#     query_vector = openai_client.embeddings.create(
+#         model=EMBEDDING_MODEL, input=emb_query
+#     ).data[0].embedding
+ 
+    
+#     if filters:
+#         res = index.query(vector=query_vector, top_k=top_k, include_metadata=True, filter=filters)
+#     else:
+#         res = index.query(vector=query_vector, top_k=top_k, include_metadata=True)
+ 
+#     initial_list = []
+#     for m in res.get("matches", []):
+#         md = m["metadata"]
+#         s = {
+#             "Name": md.get("Namn", ""),
+#             "Purpose": md.get("Ändamål", ""),
+#             "Study Level": md.get("Utbildningsnivå", ""),
+#             "Base Score": round(m["score"], 4)
+#         }
+#         for k, v in FIELD_MAP_SV.items():
+#             if k not in s:
+#                 s[k] = md.get(v, "")
+#         s["Relevance Score"] = compute_soft_score(s, user_purpose)
+#         s["Entity Bonus"] = compute_entity_bonus(s, user_purpose)
+#         s["Adjusted Score"] = round(
+#             s["Base Score"] + s["Relevance Score"] + s["Entity Bonus"], 4
+#         )
+#         initial_list.append(s)
+ 
+#     if debug:
+#         print(f"\n{'='*60}")
+#         print(f"[PINECONE] Retrieved {len(initial_list)} candidates")
+#         print(f"{'='*60}")
+
+#     kept_rules = []
+#     excluded_rules = []
+ 
+#     for sch in initial_list:
+#         # Gender check runs first — cheapest, most reliable, domain-agnostic
+#         if gender:
+#             fail_gender, gender_reason = should_exclude_gender_mismatch(sch, gender)
+#             if fail_gender:
+#                 excluded_rules.append((sch, gender_reason))
+#                 continue
+
+#         fail_entity, entity_reason = should_exclude_entity_type(sch, user_purpose)
+#         if fail_entity:
+#             excluded_rules.append((sch, entity_reason))
+#             continue
+
+#         fail_research, research_reason = should_exclude_research_doctoral(sch, user_purpose)
+#         if fail_research:
+#             cls = classify_scholarship(sch)
+#             excluded_rules.append((sch, f"Research Mismatch [{cls}] - {research_reason}"))
+#             continue
+
+#         fail_level, level_reason = should_exclude_study_level_mismatch(sch, user_purpose)
+#         if fail_level:
+#             excluded_rules.append((sch, f"Study Level Mismatch - {level_reason}"))
+#             continue
+
+#         kept_rules.append(sch)
+ 
+#     if debug:
+#         pass  
+#     kept_semantic = []
+#     excluded_semantic = []
+ 
+#     for sch in kept_rules:
+#         if semantic_prefilter(sch, user_purpose):
+#             kept_semantic.append(sch)
+#         else:
+#             excluded_semantic.append(sch)
+ 
+#     if debug:
+#         pass  
+#     final_data = sorted(
+#         kept_semantic, key=lambda x: x["Adjusted Score"], reverse=True
+#     )[:MAX_CANDIDATES_FOR_LLM]
+ 
+#     if debug:
+#         print(f"\n{'='*60}")
+#         print(f"[PRE-LLM] Sending {len(final_data)} candidates to LLM filter")
+#         print(f"{'='*60}")
+ 
+  
+#     if final_data:
+#         llm_filtered = llm_filter_scholarships(
+#             user_purpose, gender, final_data, openai_client, debug=debug, custom_system_prompt=custom_system_prompt, user_type=user_type
+#         )
+#         if len(llm_filtered) < MIN_RESULTS:
+#             if debug:
+#                 print(f"\n[SAFETY NET] LLM returned only {len(llm_filtered)} -- padding to {MIN_RESULTS}")
+#             existing_names = {s["Name"] for s in llm_filtered}
+#             padding = [s for s in final_data if s["Name"] not in existing_names]
+#             final_data = llm_filtered + padding[:MIN_RESULTS - len(llm_filtered)]
+#         else:
+#             final_data = llm_filtered
+ 
+#     if use_llm_rerank and len(final_data) > 1:
+#         final_data = rerank_with_llm(
+#             user_purpose, final_data, openai_client, debug=debug, custom_rerank_prompt=custom_rerank_prompt, user_type=user_type, gender=gender
+#         )
+ 
+#     if debug:
+#         print(f"\n{'='*60}")
+#         print(f"[FINAL] Returning {len(final_data[:MIN_RESULTS])} results")
+#         print(f"{'='*60}")
+#         for i, s in enumerate(final_data[:MIN_RESULTS]):
+#             cls = classify_scholarship(s)
+#             print(f"  {i+1}. [{cls:>8}] {s['Name']}")
+#             print(f"     Purpose: {s['Purpose'][:200]}")
+ 
+#     return final_data[:MIN_RESULTS]
+
 def find_scholarships_v2(
     user_purpose,
     gender=None,
@@ -2884,8 +3054,7 @@ def find_scholarships_v2(
     custom_rerank_prompt=None,
 ):
     global index, INDEX_NAME
-    
-  
+
     try:
         from django.conf import settings
         if settings.SITE_CONFIG:
@@ -2894,10 +3063,11 @@ def find_scholarships_v2(
     except Exception as e:
         if debug:
             print(f"Note: Using default index. Details: {e}")
-    
+
     _is_res_user = is_research_user(user_purpose)
     _is_ug_user = contains_any(user_purpose, UNDERGRAD_TERMS)
- 
+    is_org_user = user_type and user_type.lower() in ["organization", "organisation", "idrottsförening"]
+
     if debug:
         print(f"\n{'#'*60}")
         print(f"# SEARCH: {user_purpose}")
@@ -2908,34 +3078,106 @@ def find_scholarships_v2(
         print(f"# User Type: {user_type or 'not specified'}")
         print(f"# Municipality Filter: {municipality_filter} | Municipality: {municipality or 'none'}")
         print(f"{'#'*60}")
- 
-    filters = {}
- 
+
+    # Base filters (user_type only — no municipality yet)
+    base_filters = {}
     if user_type:
         user_type_lower = user_type.lower()
         if user_type_lower in ["individual", "privatperson", "person"]:
-            filters["Kommentar"] = {"$in": ["Flera", "Studier"]}
+            base_filters["Kommentar"] = {"$in": ["Flera", "Studier"]}
         elif user_type_lower in ["organization", "organisation", "idrottsförening"]:
-            filters["Kommentar"] = {"$in": ["Flera", "Idrottsförening"]}
- 
-    # if municipality_filter and municipality:
-    #     filters["Kommun"] = municipality.strip()
-    if municipality_filter and municipality:
-        filters["Kommun"] = resolve_municipality(municipality)
+            base_filters["Kommentar"] = {"$in": ["Flera", "Idrottsförening"]}
+
     if debug:
-        print(f"Pinecone Filters:\n{json.dumps(filters, indent=4, ensure_ascii=False)}\n")
- 
+        print(f"Base Filters:\n{json.dumps(base_filters, indent=4, ensure_ascii=False)}\n")
+
     emb_query = expand_user_query_for_embedding(user_purpose)
     query_vector = openai_client.embeddings.create(
         model=EMBEDDING_MODEL, input=emb_query
     ).data[0].embedding
- 
-    
-    if filters:
-        res = index.query(vector=query_vector, top_k=top_k, include_metadata=True, filter=filters)
+
+    # -------------------------------------------------------
+    # RETRIEVAL — two paths depending on org + municipality
+    # -------------------------------------------------------
+    if is_org_user and municipality_filter and municipality:
+        resolved_municipality = resolve_municipality(municipality)
+
+        if debug:
+            print(f"[ORG SOFT GEOGRAPHY] Municipality: {municipality} → {resolved_municipality}")
+            print(f"[ORG SOFT GEOGRAPHY] Fetching local pool + national pool separately")
+
+        # POOL 1 — Local: municipality match + org filter
+        local_filters = dict(base_filters)
+        local_filters["Kommun"] = resolved_municipality
+
+        local_res = index.query(
+            vector=query_vector,
+            top_k=50,
+            include_metadata=True,
+            filter=local_filters
+        )
+
+        # POOL 2 — National: org filter only, no municipality restriction
+        national_res = index.query(
+            vector=query_vector,
+            top_k=top_k,
+            include_metadata=True,
+            filter=base_filters if base_filters else None
+        )
+
+        if debug:
+            print(f"[ORG SOFT GEOGRAPHY] Local results: {len(local_res.get('matches', []))}")
+            print(f"[ORG SOFT GEOGRAPHY] National results: {len(national_res.get('matches', []))}")
+
+        # Merge: local first then national, deduplicate by name
+        seen_names = set()
+        merged_matches = []
+
+        for m in local_res.get("matches", []):
+            name = m["metadata"].get("Namn", "")
+            if name not in seen_names:
+                m["_is_local"] = True
+                merged_matches.append(m)
+                seen_names.add(name)
+
+        for m in national_res.get("matches", []):
+            name = m["metadata"].get("Namn", "")
+            if name not in seen_names:
+                m["_is_local"] = False
+                merged_matches.append(m)
+                seen_names.add(name)
+
+        if debug:
+            print(f"[ORG SOFT GEOGRAPHY] Merged pool: {len(merged_matches)} total")
+
+        res = {"matches": merged_matches}
+
     else:
-        res = index.query(vector=query_vector, top_k=top_k, include_metadata=True)
- 
+        # Original single-query path — individual users and org without municipality
+        filters = dict(base_filters)
+        if municipality_filter and municipality:
+            filters["Kommun"] = resolve_municipality(municipality)
+
+        if debug:
+            print(f"Pinecone Filters:\n{json.dumps(filters, indent=4, ensure_ascii=False)}\n")
+
+        if filters:
+            res = index.query(
+                vector=query_vector,
+                top_k=top_k,
+                include_metadata=True,
+                filter=filters
+            )
+        else:
+            res = index.query(
+                vector=query_vector,
+                top_k=top_k,
+                include_metadata=True
+            )
+
+    # -------------------------------------------------------
+    # Build initial list from matches
+    # -------------------------------------------------------
     initial_list = []
     for m in res.get("matches", []):
         md = m["metadata"]
@@ -2943,7 +3185,8 @@ def find_scholarships_v2(
             "Name": md.get("Namn", ""),
             "Purpose": md.get("Ändamål", ""),
             "Study Level": md.get("Utbildningsnivå", ""),
-            "Base Score": round(m["score"], 4)
+            "Base Score": round(m["score"], 4),
+            "_is_local": m.get("_is_local", False),
         }
         for k, v in FIELD_MAP_SV.items():
             if k not in s:
@@ -2954,15 +3197,21 @@ def find_scholarships_v2(
             s["Base Score"] + s["Relevance Score"] + s["Entity Bonus"], 4
         )
         initial_list.append(s)
- 
+
     if debug:
         print(f"\n{'='*60}")
         print(f"[PINECONE] Retrieved {len(initial_list)} candidates")
+        local_count = sum(1 for s in initial_list if s.get("_is_local"))
+        if is_org_user and municipality_filter and municipality:
+            print(f"[PINECONE] Local: {local_count} | National: {len(initial_list) - local_count}")
         print(f"{'='*60}")
 
+    # -------------------------------------------------------
+    # PASS 1 — Rules-based filtering
+    # -------------------------------------------------------
     kept_rules = []
     excluded_rules = []
- 
+
     for sch in initial_list:
         # Gender check runs first — cheapest, most reliable, domain-agnostic
         if gender:
@@ -2988,59 +3237,140 @@ def find_scholarships_v2(
             continue
 
         kept_rules.append(sch)
- 
+
     if debug:
-        pass  
+        print(f"\n{'='*60}")
+        print(f"[RULE PASS] INCLUDED ({len(kept_rules)}) | EXCLUDED ({len(excluded_rules)})")
+        print(f"{'='*60}")
+        for s in kept_rules:
+            cls = classify_scholarship(s)
+            dm = "[DOMAIN]" if is_domain_match(combined_scholarship_text(s), user_purpose) else "[GENERAL]"
+            local_tag = "[LOCAL]" if s.get("_is_local") else "[NATIONAL]"
+            print(f"  [+] {local_tag}{dm}[{cls:>8}] {s['Name']}")
+            print(f"      Purpose: {s['Purpose'][:150]}")
+        print(f"\n  --- EXCLUDED ---")
+        for s, reason in excluded_rules:
+            print(f"  [-] {s['Name']} -> {reason}")
+
+    # -------------------------------------------------------
+    # PASS 2 — Semantic threshold
+    # -------------------------------------------------------
     kept_semantic = []
     excluded_semantic = []
- 
+
     for sch in kept_rules:
         if semantic_prefilter(sch, user_purpose):
             kept_semantic.append(sch)
         else:
             excluded_semantic.append(sch)
- 
+
     if debug:
-        pass  
-    final_data = sorted(
-        kept_semantic, key=lambda x: x["Adjusted Score"], reverse=True
-    )[:MAX_CANDIDATES_FOR_LLM]
- 
+        print(f"\n{'='*60}")
+        print(f"[SEMANTIC PASS] INCLUDED ({len(kept_semantic)}) | EXCLUDED ({len(excluded_semantic)})")
+        print(f"{'='*60}")
+
+    # For org soft geography: sort local before national within same score band
+    # For everyone else: sort by adjusted score descending
+    if is_org_user and municipality_filter and municipality:
+        final_data = sorted(
+            kept_semantic,
+            key=lambda x: (not x.get("_is_local", False), -x["Adjusted Score"])
+        )[:MAX_CANDIDATES_FOR_LLM]
+    else:
+        final_data = sorted(
+            kept_semantic,
+            key=lambda x: x["Adjusted Score"],
+            reverse=True
+        )[:MAX_CANDIDATES_FOR_LLM]
+
     if debug:
         print(f"\n{'='*60}")
         print(f"[PRE-LLM] Sending {len(final_data)} candidates to LLM filter")
         print(f"{'='*60}")
- 
-  
+
+    # -------------------------------------------------------
+    # PASS 3 — LLM filtering
+    # -------------------------------------------------------
     if final_data:
         llm_filtered = llm_filter_scholarships(
-            user_purpose, gender, final_data, openai_client, debug=debug, custom_system_prompt=custom_system_prompt, user_type=user_type
+            user_purpose, gender, final_data, openai_client,
+            debug=debug,
+            custom_system_prompt=custom_system_prompt,
+            user_type=user_type
         )
+
         if len(llm_filtered) < MIN_RESULTS:
             if debug:
-                print(f"\n[SAFETY NET] LLM returned only {len(llm_filtered)} -- padding to {MIN_RESULTS}")
+                print(f"\n[SAFETY NET] LLM returned only {len(llm_filtered)} — padding to {MIN_RESULTS}")
+
             existing_names = {s["Name"] for s in llm_filtered}
-            padding = [s for s in final_data if s["Name"] not in existing_names]
-            final_data = llm_filtered + padding[:MIN_RESULTS - len(llm_filtered)]
+
+            # For org soft geography: prioritise local padding first
+            if is_org_user and municipality_filter and municipality:
+                local_padding = [
+                    s for s in final_data
+                    if s["Name"] not in existing_names
+                    and s.get("_is_local", False)
+                ]
+                national_padding = [
+                    s for s in final_data
+                    if s["Name"] not in existing_names
+                    and not s.get("_is_local", False)
+                ]
+                padding = (local_padding + national_padding)[:MIN_RESULTS - len(llm_filtered)]
+            else:
+                domain_padding = [
+                    s for s in final_data
+                    if s["Name"] not in existing_names
+                    and is_domain_match(combined_scholarship_text(s), user_purpose)
+                ]
+                student_padding = [
+                    s for s in final_data
+                    if s["Name"] not in existing_names
+                    and s["Name"] not in {x["Name"] for x in domain_padding}
+                    and is_strongly_student_facing(combined_scholarship_text(s))
+                ]
+                remaining_padding = [
+                    s for s in final_data
+                    if s["Name"] not in existing_names
+                    and s["Name"] not in {x["Name"] for x in domain_padding}
+                    and s["Name"] not in {x["Name"] for x in student_padding}
+                ]
+                padding = (domain_padding + student_padding + remaining_padding)[:MIN_RESULTS - len(llm_filtered)]
+
+            final_data = llm_filtered + padding
+
+            if debug:
+                print(f"[SAFETY NET] Padded to {len(final_data)} results")
         else:
             final_data = llm_filtered
- 
+
+    # -------------------------------------------------------
+    # PASS 4 — LLM reranking
+    # -------------------------------------------------------
     if use_llm_rerank and len(final_data) > 1:
+        if debug:
+            print(f"\n[LLM RERANK] Received {len(final_data)} scholarships to rank")
+
         final_data = rerank_with_llm(
-            user_purpose, final_data, openai_client, debug=debug, custom_rerank_prompt=custom_rerank_prompt, user_type=user_type, gender=gender
+            user_purpose, final_data, openai_client,
+            debug=debug,
+            custom_rerank_prompt=custom_rerank_prompt,
+            user_type=user_type,
+            gender=gender
         )
- 
+
     if debug:
         print(f"\n{'='*60}")
         print(f"[FINAL] Returning {len(final_data[:MIN_RESULTS])} results")
         print(f"{'='*60}")
         for i, s in enumerate(final_data[:MIN_RESULTS]):
             cls = classify_scholarship(s)
-            print(f"  {i+1}. [{cls:>8}] {s['Name']}")
+            local_tag = "[LOCAL]" if s.get("_is_local") else "[NATIONAL]"
+            print(f"  {i+1}. {local_tag}[{cls:>8}] {s['Name']}")
             print(f"     Purpose: {s['Purpose'][:200]}")
- 
-    return final_data[:MIN_RESULTS]
 
+    return final_data[:MIN_RESULTS]
 
 def run_single_audit(query: str, gender: str = None, debug: bool = False) -> Dict:
     results = find_scholarships_v2(query, gender=gender, debug=debug)
