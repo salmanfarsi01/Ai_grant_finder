@@ -312,64 +312,49 @@ class PreDefinedScholarship(models.Model):
         blank=True,
         null=True
     )
+    
+    study_level = models.CharField(
+        max_length=50,
+        choices=[
+            ('undergraduate', 'Undergraduate/Bachelor'),
+            ('master', 'Master\'s'),
+            ('phd', 'PhD/Doctoral'),
+            ('all', 'All Levels'),
+        ],
+        default='all',
+        null=True,
+        blank=True,
+        help_text='Target study level for this scholarship'
+    )
 
     subject = models.CharField(null=True, blank=True, choices=[
-        # educationLevels
-        ("always", "always"),
-        # ("primarySchool", "primarySchool"),
-        # ("secondarySchool", "secondarySchool"),
-        # ("postSecondary", "postSecondary"),
-        # ("university", "university"),
-        # ("master", "master"),
-        # ("phd", "phd"),
-
-        # upperSecondary
-        ("socialSciences", "socialSciences"),
-        ("economics", "economics"),
-        ("naturalSciences", "naturalSciences"),
-        ("technology", "technology"),
-        ("arts", "arts"),
-        ("electricityEnergy", "electricityEnergy"),
-        ("vehicleTransport", "vehicleTransport"),
-        ("construction", "construction"),
-        ("salesService", "salesService"),
-        ("childRecreation", "childRecreation"),
-        ("other", "other"),
-
-        # universityPrograms
-        ("engineering", "engineering"),
-        ("medicine", "medicine"),
-        ("cs", "cs"),
-        ("education", "education"),
-        ("psychology", "psychology"),
-        ("law", "law"),
-        ("environment", "environment"),
-        ("design", "design"),
-        ("biology", "biology"),
-
-        # masterPrograms
-        ("publicHealth", "publicHealth"),
-        ("engineering", "engineering"),
-        ("business", "business"),
-        ("cs", "cs"),
-        ("education", "education"),
-        ("environment", "environment"),
-        ("lifeScience", "lifeScience"),
-        ("law", "law"),
-        ("design", "design"),
-        ("socialSciences", "socialSciences"),
-
-        # postSecondaryPrograms
-        ("pharmacyTech", "pharmacyTech"),
-        ("ambulance", "ambulance"),
-        ("animalCare", "animalCare"),
-        ("softwareDev", "softwareDev"),
-        ("trainDriver", "trainDriver"),
-        ("dentalNurse", "dentalNurse"),
-        ("medicalAdmin", "medicalAdmin"),
-        ("accounting", "accounting"),
-        ("childcare", "childcare"),
-        ("sport", "sport"),
+        # Special
+        ("always", "Always"),
+        ("other", "Other"),
+        
+        # UNDERGRADUATE subjects
+        ("engineering_technology", "Engineering and Technology"),
+        ("economics_business", "Economics, Business Administration & Management"),
+        ("medicine_health", "Medicine and Health Sciences"),
+        ("cs_it_data", "Computer Science / IT / Data Science"),
+        ("education_pedagogy", "Education and Pedagogy"),
+        ("psychology_behavioral", "Psychology and Behavioral Sciences"),
+        ("law_political", "Law and Political Science"),
+        ("environment_sustainability", "Environmental and Sustainability Sciences"),
+        ("design_architecture_arts", "Design, Architecture, and Creative Arts"),
+        ("biology_chemistry_life", "Biology, Chemistry, and Life Sciences"),
+        
+        # MASTER'S subjects
+        ("public_health_epidemiology", "Public Health / Epidemiology"),
+        ("eng_tech_advanced", "Engineering & Technology (cybersecurity, supply chain, machine)"),
+        ("business_management", "Business & Management (Finance, Accounting, International Business)"),
+        ("cs_digital_data_advanced", "Computer Science / Digital Business / Data Science"),
+        ("education_didactics", "Education & Pedagogy (Didactics, Leadership)"),
+        ("environment_urban", "Environmental & Sustainability Sciences / Urban Planning"),
+        ("life_science_biotech", "Life Sciences & Biotechnology"),
+        ("law_llm", "Law (LL.M / Legal Studies)"),
+        ("design_creative_advanced", "Design, Architecture & Creative Arts"),
+        ("social_sciences", "Social Sciences (Psychology, Social Work, Political Science)"),
     ])
 
     # study_level = models.CharField(choices=[

@@ -32,6 +32,7 @@ from . import stipo54
 from . import report_utils
 from .models import ScholarshipApplicant, Review, FAQ, Coupon, PreDefinedScholarship, SiteConfig
 from deep_translator import GoogleTranslator
+import re
 
 data = {
         "user_profile": {
@@ -70,18 +71,22 @@ data = {
     }
 
 
-def translate_field(text, target_language="en", source_language="sv"):
-    """Safely translate a field using GoogleTranslator"""
+def translate_field(text, target_language="en", source_language="sv", debug=False):
+    """Translate text from Swedish to English using GoogleTranslator"""
     if not text or not isinstance(text, str):
         return text
-    try:
-        if target_language.lower() == "en" and source_language.lower() == "sv":
+    
+    # Only translate SV→EN (data is stored in Swedish)
+    if target_language.lower() == "en" and source_language.lower() == "sv":
+        try:
             translated = GoogleTranslator(source_language='sv', target_language='en').translate(text)
             return translated
-        return text
-    except Exception as e:
-        print(f"Translation error: {e}")
-        return text
+        except Exception as e:
+            print(f"[translate_field] ERROR translating: {e}")
+            return text
+    
+    # For any other direction, return unchanged
+    return text
 
 
 def translate_predefined_scholarships(scholarships, output_language="en"):
@@ -106,15 +111,16 @@ def translate_predefined_scholarships(scholarships, output_language="en"):
     }
     
     translated = []
-    for sch in scholarships:
+    for idx, sch in enumerate(scholarships):
         sch_copy = sch.copy() if isinstance(sch, dict) else sch
         
-        # Handle Swedish language: rename field keys and keep values as-is
+        # Handle Swedish language: rename field keys only (data is already in Swedish)
         if output_language.lower() == "sv":
             sch_sv = {}
             for key, value in sch_copy.items():
                 # Translate field name if mapping exists, otherwise keep original
                 translated_key = field_name_translations_sv.get(key, key)
+                # NO translation of Purpose content - it's already in Swedish!
                 sch_sv[translated_key] = value
             translated.append(sch_sv)
         
@@ -124,11 +130,27 @@ def translate_predefined_scholarships(scholarships, output_language="en"):
             if "Purpose" in sch_copy and isinstance(sch_copy.get("Purpose"), str):
                 sch_copy["Purpose"] = translate_field(sch_copy["Purpose"], target_language="en", source_language="sv")
             translated.append(sch_copy)
+        
         else:
-            # For any other language, return as-is
             translated.append(sch_copy)
     
     return translated
+
+def _matches_any(text, terms):
+    """
+    Whole-word substring match for short terms (≤3 chars),
+    plain substring for longer terms.
+    Prevents 'it' matching inside 'political', 'entity' etc.
+    """
+    for term in terms:
+        if len(term) <= 3:
+            # word boundary match for short terms
+            if re.search(r'\b' + re.escape(term) + r'\b', text):
+                return True
+        else:
+            if term in text:
+                return True
+    return False
 
 @api_view(['post'])
 def submit_application(request):
@@ -317,77 +339,177 @@ def generate_data(request):
 
     predefined = PreDefinedScholarship.objects.all()
     
-    if application.form_data['role'] == 'Organisation':
-        predefined_always = PreDefinedScholarship.objects.filter(sport__isnull = False, sport='always')
-    else:
-        predefined_always = PreDefinedScholarship.objects.filter(subject__isnull = False, subject='always')
-
-
-    if application.form_data['role'] == 'Organisation':
-        predefined = predefined.filter(sport__isnull=False)
-        application.form_data['education_level_option']=[]
-
-
-        if 'Football' in application.form_data['sport'] \
-                or 'Fotboll' in application.form_data['sport']:
-            predefined = predefined.filter(sport="football")
-        elif 'Athletics' in application.form_data['sport'] \
-                or 'Friidrott' in application.form_data['sport']:
-            predefined = predefined.filter(sport="athletics")
-        elif 'Golf' in application.form_data['sport']:
-            predefined = predefined.filter(sport="golf")
-        elif 'Gymnastics' in application.form_data['sport'] \
-                or 'Gymnastik' in application.form_data['sport']:
-            predefined = predefined.filter(sport="gymnastics")
-        elif 'Floorball' in application.form_data['sport'] \
-                or 'Innebandy' in application.form_data['sport']:
-            predefined = predefined.filter(sport="floorball")
-        elif 'Ice Hockey' in application.form_data['sport'] \
-                or 'Ishockey' in application.form_data['sport']:
-            predefined = predefined.filter(sport="ice_hockey")
-        elif 'Swimming' in application.form_data['sport'] \
-                or 'Simidrott' in application.form_data['sport'] \
-                or 'Simning' in application.form_data['sport']:
-            predefined = predefined.filter(sport="swimming")
-        elif 'Handball' in application.form_data['sport'] \
-                or 'Handboll' in application.form_data['sport']:
-            predefined = predefined.filter(sport="handball")
-        elif 'Equestrian' in application.form_data['sport'] \
-                or 'Ridsport' in application.form_data['sport']:
-            predefined = predefined.filter(sport="equestrian")
-        elif 'Motorsports' in application.form_data['sport'] \
-                or 'Motorsport' in application.form_data['sport'] \
-                or 'Snowmobile' in application.form_data['sport'] \
-                or 'Snöskoter' in application.form_data['sport']:
-            predefined = predefined.filter(sport="motorsports")
-    else:
-        predefined = predefined.filter(sport__isnull=True)
-
-
-        if "Economics" in application.form_data['education_level_option']\
-            or "Ekonomiprogrammet" in application.form_data['education_level_option']:
-            print("DEBUG <<< ING >>>")
-            print(json.dumps(PreDefinedScholarshipSerializer(predefined, many=True).data, indent=2))
-            predefined = predefined.filter(subject="economics")
-            print("DEBUG <<< ING >>>")
-            print(json.dumps(PreDefinedScholarshipSerializer(predefined, many=True).data, indent=2))
-
-            predefined=predefined.exclude(subject='always')
-
-        elif "Engineering" in application.form_data['education_level_option']\
-            or "Teknik och ingenjörsvetenskap" in application.form_data['education_level_option']:
-            predefined = predefined.filter(subject="engineering")
-            predefined=predefined.exclude(subject='always')
-
-        elif "Law" in application.form_data['education_level_option']\
-            or "Juridik" in application.form_data['education_level_option']:
-            predefined = predefined.filter(subject="law")
-            predefined=predefined.exclude(subject='always')
-
+    # Extract study level from form data
+    study_level = application.form_data.get('study_level', '').lower()
+    # Extract subject from education_level_option AND education_level_other (for "Annat"/Other case)
+    education_level_option = application.form_data.get('education_level_option', [])
+    education_level_other = application.form_data.get('education_level_other', '')
+    subject = None
+    
+    # Map education_level_option to subject field values
+    # Support both old format (economics, engineering, law) and new format
+    # Include both regular selection and "Annat" (Other) field
+    # Handle both list and string input formats
+    education_parts = []
+    if education_level_option:
+        if isinstance(education_level_option, list):
+            education_parts = education_level_option
         else:
-            predefined=predefined.exclude(subject__in=["economics", "engineering", "law", "socialSciences"])
-            predefined=predefined.exclude(subject__in=['always'])
+            # If it's a string, wrap it in a list (don't use list() which converts to chars)
+            education_parts = [str(education_level_option)]
+    if education_level_other:
+        education_parts.append(education_level_other)
+    education_str = ' '.join(education_parts).lower()
+    
+    print(f"\n[SUBMIT_APPLICATION - DEBUG SUBJECT MAPPING]")
+    print(f"  education_level_option: {education_level_option} (type: {type(education_level_option).__name__})")
+    print(f"  education_level_other: {education_level_other}")
+    print(f"  education_str: {education_str}")
+    
+    # Detect study level first — subject mapping depends on it
+    study_level_lower = study_level.lower()
+    if any(t in study_level_lower for t in [
+        'undergraduate', 'bachelor', 'kandidat', 'kandidatnivå', 'grundnivå'
+    ]):
+        detected_level = 'undergraduate'
+    elif any(t in study_level_lower for t in [
+        'master', 'postgraduate', 'masternivå', 'magister'
+    ]):
+        detected_level = 'master'
+    elif any(t in study_level_lower for t in [
+        'phd', 'doctoral', 'doktorand', 'forskarutbildning',
+        'doktorsexamen', 'licentiat'
+    ]):
+        detected_level = 'phd'
+    else:
+        detected_level = 'unknown'
+        subject = None
 
+    if detected_level == 'undergraduate':
+        # Undergraduate subject mapping → undergraduate DB keys
+        if _matches_any(education_str, ['law', 'political', 'juridik', 'legal', 'statsvetenskap']):
+            subject = 'law_political'
+        elif _matches_any(education_str, ['engineering', 'technology', 'teknik', 'ingenjörsvetenskap']):
+            subject = 'engineering_technology'
+        elif _matches_any(education_str, ['economics', 'business', 'ekonomi', 'administration', 'företagsekonomi', 'management']):
+            subject = 'economics_business'
+        elif _matches_any(education_str, ['medicine', 'health', 'medicin', 'hälsa', 'vårdutbildningar', 'vård']):
+            subject = 'medicine_health'
+        elif _matches_any(education_str, ['computer', 'it', 'data', 'datavetenskap', 'datalogi', 'datascience']):
+            subject = 'cs_it_data'
+        elif _matches_any(education_str, ['education', 'pedagogy', 'utbildning', 'pedagogik']):
+            subject = 'education_pedagogy'
+        elif _matches_any(education_str, ['psychology', 'behavioral', 'psykologi', 'beteendevetenskap']):
+            subject = 'psychology_behavioral'
+        elif _matches_any(education_str, ['environment', 'sustainability', 'miljö', 'hållbarhet']):
+            subject = 'environment_sustainability'
+        elif _matches_any(education_str, ['design', 'architecture', 'creative', 'arts', 'arkitektur', 'kreativa']):
+            subject = 'design_architecture_arts'
+        elif _matches_any(education_str, ['biology', 'chemistry', 'life science', 'biologi', 'kemi', 'naturvetenskap', 'livsvetenskap']):
+            subject = 'biology_chemistry_life'
+
+    elif detected_level == 'master':
+        # Master's subject mapping → master DB keys (eng_tech_advanced etc.)
+        if _matches_any(education_str, ['law', 'llm', 'legal', 'juridik']):
+            subject = 'law_llm'
+        elif _matches_any(education_str, ['public health', 'epidemiology', 'folkhälsa', 'epidemiologi', 'folkhälsovetenskap']):
+            subject = 'public_health_epidemiology'
+        elif _matches_any(education_str, ['engineering', 'technology', 'teknik', 'ingenjörsvetenskap', 'cybersecurity', 'supply chain', 'machine engineering']):
+            subject = 'eng_tech_advanced'
+        elif _matches_any(education_str, ['business', 'management', 'finance', 'accounting', 'international business', 'ekonomi', 'företagsekonomi']):
+            subject = 'business_management'
+        elif _matches_any(education_str, ['computer', 'digital business', 'data science', 'it', 'datalogi', 'datavetenskap']):
+            subject = 'cs_digital_data_advanced'
+        elif _matches_any(education_str, ['education', 'pedagogy', 'didactics', 'leadership', 'utbildning', 'pedagogik']):
+            subject = 'education_didactics'
+        elif _matches_any(education_str, ['environment', 'sustainability', 'urban planning', 'miljö', 'hållbarhet']):
+            subject = 'environment_urban'
+        elif _matches_any(education_str, ['life science', 'biotechnology', 'biotech', 'livsvetenskap', 'bioteknologi']):
+            subject = 'life_science_biotech'
+        elif _matches_any(education_str, ['design', 'architecture', 'creative', 'arts', 'arkitektur', 'kreativa']):
+            subject = 'design_creative_advanced'
+        elif _matches_any(education_str, ['social science', 'social work', 'psychology', 'political science', 'samhällsvetenskap', 'socialt', 'psykologi']):
+            subject = 'social_sciences'
+
+        elif detected_level == 'phd':
+            # PhD has no subject filtering — always scholarships only
+            subject = None
+
+    print(f"\n[SUBJECT MAPPING DEBUG]")
+    print(f"  education_str: {education_str}")
+    print(f"  detected_level: {detected_level}")
+    print(f"  subject (mapped): {subject}")
+    
+    # If user selected something but no match was found, only show "always" scholarships
+    # This prevents irrelevant subject scholarships from appearing
+    no_subject_match = (education_level_option or education_level_other) and subject is None
+    
+    # Use new study level filtering logic
+    predefined_always, predefined_filtered = stipo54.get_predefined_scholarships_by_level(
+        predefined,
+        study_level=study_level,
+        subject=subject,
+        role=application.form_data['role'],
+        sport=application.form_data.get('sport') if application.form_data['role'] == 'Organisation' else None,
+        debug=True
+    )
+    
+    # If no subject was matched but user selected something, ignore the filtered results
+    if no_subject_match:
+        predefined_filtered = predefined.none()
+    
+    if application.form_data['role'] == 'Organisation':
+        # For organizations: start with subject-filtered results
+        # Only override with sport filtering if a sport was actually selected
+        sport_selected = application.form_data.get('sport', '')
+        
+        if sport_selected:
+            # Organization selected a sport - filter by sport
+            predefined_always = PreDefinedScholarship.objects.filter(sport__isnull=False, sport='always', is_organization=True)
+            predefined = predefined.filter(sport__isnull=False, is_organization=True)
+            
+            if 'Football' in sport_selected or 'Fotboll' in sport_selected:
+                predefined = predefined.filter(sport="football")
+            elif 'Athletics' in sport_selected or 'Friidrott' in sport_selected:
+                predefined = predefined.filter(sport="athletics")
+            elif 'Golf' in sport_selected:
+                predefined = predefined.filter(sport="golf")
+            elif 'Gymnastics' in sport_selected or 'Gymnastik' in sport_selected:
+                predefined = predefined.filter(sport="gymnastics")
+            elif 'Floorball' in sport_selected or 'Innebandy' in sport_selected:
+                predefined = predefined.filter(sport="floorball")
+            elif 'Ice Hockey' in sport_selected or 'Ishockey' in sport_selected:
+                predefined = predefined.filter(sport="ice_hockey")
+            elif 'Swimming' in sport_selected or 'Simidrott' in sport_selected or 'Simning' in sport_selected:
+                predefined = predefined.filter(sport="swimming")
+            elif 'Handball' in sport_selected or 'Handboll' in sport_selected:
+                predefined = predefined.filter(sport="handball")
+            elif 'Equestrian' in sport_selected or 'Ridsport' in sport_selected:
+                predefined = predefined.filter(sport="equestrian")
+            elif 'Motorsports' in sport_selected or 'Motorsport' in sport_selected or 'Snowmobile' in sport_selected or 'Snöskoter' in sport_selected:
+                predefined = predefined.filter(sport="motorsports")
+            
+            predefined_filtered = predefined
+        else:
+            # Organization did NOT select a sport - use subject-filtered results from get_predefined_scholarships_by_level
+            # predefined_always and predefined_filtered are already correct from the function call above
+            # Just add is_organization filter
+            predefined_always = predefined_always.filter(is_organization=True)
+            predefined_filtered = predefined_filtered.filter(is_organization=True)
+        
+        application.form_data['education_level_option'] = []
+    else:
+        # For individuals: use the filtered results from get_predefined_scholarships_by_level
+        # Exclude "always" from the filtered set since it's handled separately
+        pass
+
+    # Debug: show what scholarships are returned
+    print(f"\n[SUBMIT_APPLICATION - PREDEFINED SCHOLARSHIPS RESULT]")
+    print(f"  Role: {application.form_data['role']}")
+    print(f"  predefined_always count: {predefined_always.count()}")
+    print(f"  predefined_filtered count: {predefined_filtered.count()}")
+    if predefined_filtered.count() > 0:
+        print(f"  First filtered scholarship subject: {predefined_filtered.first().subject}")
 
 
     # Combine AI results with predefined scholarships
@@ -396,7 +518,7 @@ def generate_data(request):
     predefined_scholarships_data = PreDefinedScholarshipSerializer(
         predefined_always, many=True, language=output_language
     ).data + PreDefinedScholarshipSerializer(
-        predefined, many=True, language=output_language
+        predefined_filtered, many=True, language=output_language
     ).data
     
     # Translate predefined scholarships Purpose field to match output language
@@ -646,78 +768,122 @@ def generate_data_playground(request):
 
     predefined = PreDefinedScholarship.objects.all()
     
-    if application.form_data['role'] == 'Organisation':
-        predefined_always = PreDefinedScholarship.objects.filter(sport__isnull = False, sport='always')
-    else:
-        predefined_always = PreDefinedScholarship.objects.filter(subject__isnull = False, subject='always')
-
-
-    if application.form_data['role'] == 'Organisation':
-        predefined = predefined.filter(is_organization=True)
-        application.form_data['education_level_option']=[]
-
-
-        if 'Football' in application.form_data['sport'] \
-                or 'Fotboll' in application.form_data['sport']:
-            predefined = predefined.filter(sport="football")
-        elif 'Athletics' in application.form_data['sport'] \
-                or 'Friidrott' in application.form_data['sport']:
-            predefined = predefined.filter(sport="athletics")
-        elif 'Golf' in application.form_data['sport']:
-            predefined = predefined.filter(sport="golf")
-        elif 'Gymnastics' in application.form_data['sport'] \
-                or 'Gymnastik' in application.form_data['sport']:
-            predefined = predefined.filter(sport="gymnastics")
-        elif 'Floorball' in application.form_data['sport'] \
-                or 'Innebandy' in application.form_data['sport']:
-            predefined = predefined.filter(sport="floorball")
-        elif 'Ice Hockey' in application.form_data['sport'] \
-                or 'Ishockey' in application.form_data['sport']:
-            predefined = predefined.filter(sport="ice_hockey")
-        elif 'Swimming' in application.form_data['sport'] \
-                or 'Simidrott' in application.form_data['sport'] \
-                or 'Simning' in application.form_data['sport']:
-            predefined = predefined.filter(sport="swimming")
-        elif 'Handball' in application.form_data['sport'] \
-                or 'Handboll' in application.form_data['sport']:
-            predefined = predefined.filter(sport="handball")
-        elif 'Equestrian' in application.form_data['sport'] \
-                or 'Ridsport' in application.form_data['sport']:
-            predefined = predefined.filter(sport="equestrian")
-        elif 'Motorsports' in application.form_data['sport'] \
-                or 'Motorsport' in application.form_data['sport'] \
-                or 'Snowmobile' in application.form_data['sport'] \
-                or 'Snöskoter' in application.form_data['sport']:
-            predefined = predefined.filter(sport="motorsports")
-    else:
-        predefined = predefined.filter(is_organization=False)
-
-
-        if "Economics" in application.form_data['education_level_option']\
-            or "Ekonomiprogrammet" in application.form_data['education_level_option']:
-
-            predefined=predefined.exclude(subject='always')
-
-        elif "Engineering" in application.form_data['education_level_option']\
-            or "Teknik och ingenjörsvetenskap" in application.form_data['education_level_option']:
-            predefined = predefined.filter(subject="engineering")
-            predefined=predefined.exclude(subject='always')
-
-        elif "Law" in application.form_data['education_level_option']\
-            or "Juridik" in application.form_data['education_level_option']:
-            predefined = predefined.filter(subject="law")
-            predefined=predefined.exclude(subject='always')
-
+    # Extract study level from form data
+    study_level = application.form_data.get('study_level', '').lower()
+    # Extract subject from education_level_option AND education_level_other (for "Annat"/Other case)
+    education_level_option = application.form_data.get('education_level_option', [])
+    education_level_other = application.form_data.get('education_level_other', '')
+    subject = None
+    
+    # Map education_level_option to subject field values
+    # Support both old format (economics, engineering, law) and new format
+    # Include both regular selection and "Annat" (Other) field
+    # Handle both list and string input formats
+    education_parts = []
+    if education_level_option:
+        if isinstance(education_level_option, list):
+            education_parts = education_level_option
         else:
-            predefined=predefined.exclude(subject__in=["economics", "engineering", "law", "socialSciences"])
-            predefined=predefined.exclude(subject__in=['always'])
-
+            # If it's a string, wrap it in a list (don't use list() which converts to chars)
+            education_parts = [str(education_level_option)]
+    if education_level_other:
+        education_parts.append(education_level_other)
+    education_str = ' '.join(education_parts).lower()
+    
+    # Undergraduate and Master's subjects - matching Swedish form names
+    if any(term in education_str for term in ['engineering', 'technology', 'teknik', 'teknik och ingenjörsvetenskap', 'ingenjörsvetenskap']):
+        subject = 'engineering_technology'
+    elif any(term in education_str for term in ['economics', 'business', 'ekonomi', 'administration', 'företagsekonomi', 'management']):
+        subject = 'economics_business'
+    elif any(term in education_str for term in ['medicine', 'health', 'medicin', 'hälsa', 'vårdutbildningar', 'vård']):
+        subject = 'medicine_health'
+    elif any(term in education_str for term in ['computer', 'it', 'data', 'datavetenskap', 'cs', 'datalogi', 'datascience']):
+        subject = 'cs_it_data'
+    elif any(term in education_str for term in ['education', 'pedagogy', 'utbildning', 'pedagogik']):
+        subject = 'education_pedagogy'
+    elif any(term in education_str for term in ['psychology', 'behavioral', 'psykologi', 'beteendevetenskap']):
+        subject = 'psychology_behavioral'
+    elif any(term in education_str for term in ['law', 'political', 'juridik', 'legal', 'statsvetenskap']):
+        subject = 'law_political'
+    elif any(term in education_str for term in ['environment', 'sustainability', 'miljö', 'hållbarhet']):
+        subject = 'environment_sustainability'
+    elif any(term in education_str for term in ['design', 'architecture', 'creative', 'arts', 'arkitektur', 'kreativa ämnen']):
+        subject = 'design_architecture_arts'
+    elif any(term in education_str for term in ['biology', 'chemistry', 'life science', 'biologi', 'kemi', 'naturvetenskap', 'natural science', 'livsvetenskap']):
+        subject = 'biology_chemistry_life'
+    elif any(term in education_str for term in ['public health', 'epidemiology', 'folkhälsa', 'folkhälsovetenskap', 'epidemiologi']):
+        subject = 'public_health_epidemiology'
+    elif any(term in education_str for term in ['social science', 'social work', 'samhäll', 'socialt', 'samhällsvetenskap']):
+        subject = 'social_sciences'
+    
+    # If user selected something but no match was found, only show "always" scholarships
+    # This prevents irrelevant subject scholarships from appearing
+    no_subject_match = (education_level_option or education_level_other) and subject is None
+    
+    # Use new study level filtering logic
+    predefined_always, predefined_filtered = stipo54.get_predefined_scholarships_by_level(
+        predefined,
+        study_level=study_level,
+        subject=subject,
+        role=application.form_data['role'],
+        sport=application.form_data.get('sport') if application.form_data['role'] == 'Organisation' else None,
+        debug=False
+    )
+    
+    # If no subject was matched but user selected something, ignore the filtered results
+    if no_subject_match:
+        predefined_filtered = predefined.none()
+    
+    if application.form_data['role'] == 'Organisation':
+        # For organizations: start with subject-filtered results
+        # Only override with sport filtering if a sport was actually selected
+        sport_selected = application.form_data.get('sport', '')
+        
+        if sport_selected:
+            # Organization selected a sport - filter by sport
+            predefined_always = PreDefinedScholarship.objects.filter(sport__isnull=False, sport='always', is_organization=True)
+            predefined = predefined.filter(is_organization=True, sport__isnull=False)
+            
+            if 'Football' in sport_selected or 'Fotboll' in sport_selected:
+                predefined = predefined.filter(sport="football")
+            elif 'Athletics' in sport_selected or 'Friidrott' in sport_selected:
+                predefined = predefined.filter(sport="athletics")
+            elif 'Golf' in sport_selected:
+                predefined = predefined.filter(sport="golf")
+            elif 'Gymnastics' in sport_selected or 'Gymnastik' in sport_selected:
+                predefined = predefined.filter(sport="gymnastics")
+            elif 'Floorball' in sport_selected or 'Innebandy' in sport_selected:
+                predefined = predefined.filter(sport="floorball")
+            elif 'Ice Hockey' in sport_selected or 'Ishockey' in sport_selected:
+                predefined = predefined.filter(sport="ice_hockey")
+            elif 'Swimming' in sport_selected or 'Simidrott' in sport_selected or 'Simning' in sport_selected:
+                predefined = predefined.filter(sport="swimming")
+            elif 'Handball' in sport_selected or 'Handboll' in sport_selected:
+                predefined = predefined.filter(sport="handball")
+            elif 'Equestrian' in sport_selected or 'Ridsport' in sport_selected:
+                predefined = predefined.filter(sport="equestrian")
+            elif 'Motorsports' in sport_selected or 'Motorsport' in sport_selected or 'Snowmobile' in sport_selected or 'Snöskoter' in sport_selected:
+                predefined = predefined.filter(sport="motorsports")
+            
+            predefined_filtered = predefined
+        else:
+            # Organization did NOT select a sport - use subject-filtered results from get_predefined_scholarships_by_level
+            # predefined_always and predefined_filtered are already correct from the function call above
+            # Just add is_organization filter
+            predefined_always = predefined_always.filter(is_organization=True)
+            predefined_filtered = predefined_filtered.filter(is_organization=True)
+        
+        application.form_data['education_level_option'] = []
+    else:
+        # For individuals: filter by is_organization=False and use study level filtering
+        predefined_always = predefined_always.filter(is_organization=False)
+        predefined_filtered = predefined_filtered.filter(is_organization=False)
 
 
     predefined_scholarships=MockSerializer(
         predefined_always, many=True
     ).data+MockSerializer(
-        predefined, many=True
+        predefined_filtered, many=True
     ).data
     
     # Translate predefined scholarships Purpose field to match output language

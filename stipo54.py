@@ -1735,12 +1735,24 @@ def should_exclude_gender_mismatch(sch: Dict, gender: str) -> Tuple[bool, str]:
         "herrar", "herrarna",
     ]
 
-    if gender.lower() == "male":
+    # Normalize gender to English equivalents (handle Swedish: "Kvinna"→"female", "Man"→"male")
+    gender_lower = gender.lower()
+    if gender_lower in ["kvinna", "female", "woman", "f"]:
+        is_female = True
+        is_male = False
+    elif gender_lower in ["man", "male", "m"]:
+        is_male = True
+        is_female = False
+    else:
+        # Unknown gender value - don't exclude
+        return False, ""
+
+    if is_male:
         matched = get_matched_terms(excl_text, FEMALE_ONLY_TERMS)
         if matched:
             return True, f"female-only scholarship for male user (matched: {matched})"
 
-    elif gender.lower() == "female":
+    elif is_female:
         matched = get_matched_terms(excl_text, MALE_ONLY_TERMS)
         if matched:
             return True, f"male-only scholarship for female user (matched: {matched})"
@@ -1860,9 +1872,11 @@ def llm_filter_scholarships(
 ):
  
     gender_rule = ""
-    if gender and gender.lower() == "male":
+    # Handle both English and Swedish gender values
+    gender_lower = gender.lower() if gender else ""
+    if gender_lower in ["male", "man"]:
         gender_rule = "\nGENDER RULE: User is male. Exclude scholarships explicitly for women only."
-    elif gender and gender.lower() == "female":
+    elif gender_lower in ["female", "kvinna", "woman"]:
         gender_rule = "\nGENDER RULE: User is female. Exclude scholarships explicitly for men only."
 
     user_domain    = get_user_domain(user_purpose)
@@ -2374,9 +2388,11 @@ def rerank_with_llm(query, scholarships, oai_client, top_n=10, debug=True, user_
 
     # Build gender_rule at top so all branches can access it
     gender_rule = ""
-    if gender and gender.lower() == "male":
+    # Handle both English and Swedish gender values
+    gender_lower = gender.lower() if gender else ""
+    if gender_lower in ["male", "man"]:
         gender_rule = "User is male. Exclude scholarships explicitly for women only."
-    elif gender and gender.lower() == "female":
+    elif gender_lower in ["female", "kvinna", "woman"]:
         gender_rule = "User is female. Exclude scholarships explicitly for men only."
 
     gender_instruction = (
@@ -3548,6 +3564,151 @@ def format_scholarship_json(scholarship_list, output_language="en"):
         formatted_list.append(entry)
     return formatted_list
     #return json.dumps(formatted_list, indent=4, ensure_ascii=False)
+
+
+def get_predefined_scholarships_by_level(predefined_queryset, study_level=None, subject=None, role=None, sport=None, debug=False):
+    """
+    Intelligently filters predefined scholarships based on study level for individuals.
+    
+    Hierarchy for INDIVIDUALS:
+      1. Scholarships with subject='always' (filtered by study_level field)
+      2. Then subject-specific scholarships (filtered by study_level field)
+      3. Then AI-matched scholarships
+    
+    For ORGANIZATIONS:
+      - Keep existing logic (based on sport)
+    
+    Args:
+        predefined_queryset: Django QuerySet of PreDefinedScholarship objects
+        study_level: User's study level (e.g., 'undergraduate', 'master', 'phd')
+        subject: User's subject/program (e.g., 'economics', 'engineering', 'law')
+        role: User's role ('Individual', 'Organisation', 'Privatperson', 'Organisation')
+        sport: User's sport (for organizations)
+        debug: Whether to print debug info
+    
+    Returns:
+        Tuple of (predefined_always, predefined_filtered) QuerySets
+    """
+    from django.db.models import Q
+    
+    # Normalize role input
+    is_individual = role and role.lower() in ['individual', 'privatperson']
+    is_org = role and role.lower() in ['organisation', 'organization']
+    
+    if debug:
+        print(f"\n[PREDEFINED STUDY LEVEL FILTER]")
+        print(f"  Role: {role} (is_individual={is_individual})")
+        print(f"  Study Level: {study_level}")
+        print(f"  Subject: {subject}")
+        print(f"  Sport: {sport}")
+    
+    if is_individual:
+        # For individuals: filter by study level
+        # Determine which study level to filter by
+        study_level_filter = None
+        if study_level:
+            study_level_lower = study_level.lower()
+            
+            if any(t in study_level_lower for t in [
+                'undergraduate', 'bachelor', 'kandidat', 'kandidatnivå', 'grundnivå'
+            ]):
+                    study_level_filter = 'undergraduate'
+            elif any(t in study_level_lower for t in [
+                    'master', 'postgraduate', 'masternivå', 'magister'
+            ]):
+                    study_level_filter = 'master'
+            elif any(t in study_level_lower for t in [
+                    'phd', 'doctoral', 'doktorand', 'forskarutbildning',
+                    'doktorsexamen', 'licentiat'
+            ]):
+                    study_level_filter = 'phd'
+        
+        # Filter "always" scholarships by study level
+        # Include if: study_level='all' OR study_level matches user's level OR study_level is null/empty
+        predefined_always = predefined_queryset.filter(
+            subject='always'
+        ).filter(
+            Q(study_level__isnull=True) | 
+            Q(study_level='') | 
+            Q(study_level='all') |
+            Q(study_level=study_level_filter)
+        )
+        
+        # Start with non-always scholarships
+        predefined_filtered = predefined_queryset.exclude(subject='always')
+        
+        # Map study_level_filter to applicable subjects
+        applicable_subjects = []
+        if study_level_filter == 'undergraduate':
+            # Undergraduate subjects
+            applicable_subjects = [
+                'engineering_technology',
+                'economics_business',
+                'medicine_health',
+                'cs_it_data',
+                'education_pedagogy',
+                'psychology_behavioral',
+                'law_political',
+                'environment_sustainability',
+                'design_architecture_arts',
+                'biology_chemistry_life',
+            ]
+        elif study_level_filter == 'master':
+            # Master's subjects
+            applicable_subjects = [
+                'public_health_epidemiology',
+                'eng_tech_advanced',
+                'business_management',
+                'cs_digital_data_advanced',
+                'education_didactics',
+                'environment_urban',
+                'life_science_biotech',
+                'law_llm',
+                'design_creative_advanced',
+                'social_sciences',
+            ]
+        elif study_level_filter == 'phd':
+            # PhD has no specific subject scholarships (only "always")
+            applicable_subjects = []
+        
+        # Filter by applicable subjects
+        if applicable_subjects:
+            predefined_filtered = predefined_filtered.filter(
+                subject__in=applicable_subjects
+            ).filter(
+                Q(study_level__isnull=True) | 
+                Q(study_level='') | 
+                Q(study_level='all') |
+                Q(study_level=study_level_filter)
+            )
+        else:
+            # For PhD or unknown level, return only "always"
+            predefined_filtered = predefined_filtered.none()
+        
+        # Additionally filter by subject if provided
+        if subject and subject != 'always':
+            predefined_filtered = predefined_filtered.filter(subject=subject)
+        
+        if debug:
+            print(f"  -> Study Level Filter: {study_level_filter}")
+            print(f"  -> Individual: filtered to {predefined_filtered.count()} subject-specific + {predefined_always.count()} always")
+    
+    elif is_org:
+        # For organizations: keep sport filtering (unchanged from original logic)
+        predefined_always = predefined_queryset.filter(subject='always')
+        predefined_filtered = predefined_queryset.exclude(subject='always')
+        
+        if debug:
+            print(f"  -> Organization: using sport-based filtering (original logic)")
+    else:
+        # Unknown role: return empty
+        predefined_always = predefined_queryset.none()
+        predefined_filtered = predefined_queryset.none()
+        
+        if debug:
+            print(f"  -> Unknown role: returning empty")
+    
+    return predefined_always, predefined_filtered
 
 # if __name__ == "__main__":
 #     results = find_scholarships_v2(
