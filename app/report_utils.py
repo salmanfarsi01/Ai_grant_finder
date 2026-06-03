@@ -1,4 +1,4 @@
-watermark = "./watermark.png"
+# watermark = "./watermark.png"
 output_file = "./student_eligibility_report.pdf"
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
@@ -143,43 +143,43 @@ def create_pdf(data, user_profile, watermark_path, output_path):
         story.append(table)
         story.append(Spacer(1, 24))
 
-    # Watermark function (tiled, 20% opacity)
-    def add_watermark(c, doc):
-        width, height = A4
-        c.saveState()
-        c.drawImage(watermark, 0, height//3, width, height//3, 
-                   mask='auto', preserveAspectRatio=True)
-        c.restoreState()
-        return
+    # # Watermark function (tiled, 20% opacity) - COMMENTED OUT
+    # def add_watermark(c, doc):
+    #     width, height = A4
+    #     c.saveState()
+    #     c.drawImage(watermark, 0, height//3, width, height//3, 
+    #                mask='auto', preserveAspectRatio=True)
+    #     c.restoreState()
+    #     return
+    #
+    #     drawing = svg2rlg(watermark_path)
+    #     width, height = A4
+    #     scale_x = width / drawing.width
+    #     scale_y = scale_x  # keep proportions
+    #
+    #     drawing.width *= scale_x
+    #     drawing.height *= scale_y
+    #     drawing.scale(scale_x, scale_y)
+    #
+    #     c.saveState()
+    #     c.setFillColorRGB(1,1,1)
+    #     # Proper transparency handling (20%)
+    #     if hasattr(c, "setFillAlpha"):
+    #         c.setFillAlpha(0.9)
+    #     elif hasattr(c, "setAlpha"):
+    #         c.setAlpha(0.9)
+    #
+    #     renderPDF.draw(drawing, c, 0, height//3)
+    #     # # Repeat watermark vertically
+    #     # y = 0
+    #     # while y < height:
+    #     #     renderPDF.draw(drawing, c, 0, y/2)
+    #     #     y += drawing.height
+    #
+    #     c.restoreState()
 
-        drawing = svg2rlg(watermark_path)
-        width, height = A4
-        scale_x = width / drawing.width
-        scale_y = scale_x  # keep proportions
-
-        drawing.width *= scale_x
-        drawing.height *= scale_y
-        drawing.scale(scale_x, scale_y)
-
-        c.saveState()
-        c.setFillColorRGB(1,1,1)
-        # Proper transparency handling (20%)
-        if hasattr(c, "setFillAlpha"):
-            c.setFillAlpha(0.9)
-        elif hasattr(c, "setAlpha"):
-            c.setAlpha(0.9)
-
-        renderPDF.draw(drawing, c, 0, height//3)
-        # # Repeat watermark vertically
-        # y = 0
-        # while y < height:
-        #     renderPDF.draw(drawing, c, 0, y/2)
-        #     y += drawing.height
-
-        c.restoreState()
-
-    # Build PDF with watermark
-    doc.build(story, onFirstPage=add_watermark, onLaterPages=add_watermark)
+    # Build PDF without watermark
+    doc.build(story)
 
 
 if __name__ == "__main__":
