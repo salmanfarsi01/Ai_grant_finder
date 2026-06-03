@@ -35,6 +35,31 @@ MIN_RESULTS = 10
 
 enc = get_encoding("cl100k_base")
 
+_BOX_CLEAN = re.compile(
+    r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'
+    r'\u2B1B\u2B1C\u2B50\u2B55'
+    r'\u00AD\u200B\u200C\u200D\uFEFF'
+    r'\u2028\u2029'
+    r'\x00-\x08\x0B\x0C\x0E-\x1F]'
+)
+_BOX_REPLACE = {
+    '\u2018': "'", '\u2019': "'",
+    '\u201C': '"', '\u201D': '"',
+    '\u2013': '-', '\u2014': '-',
+    '\u2026': '...', '\u00AB': '"',
+    '\u00BB': '"', '\u00A0': ' ',
+    '\u2022': '-',
+}
+
+def _clean_raw(text):
+    if not isinstance(text, str):
+        return text
+    text = _BOX_CLEAN.sub('', text)
+    for char, rep in _BOX_REPLACE.items():
+        text = text.replace(char, rep)
+    return text
+
+
 def get_active_index():
     """Get the active Pinecone index, with fallback to hardcoded default"""
     global INDEX_NAME
@@ -3537,6 +3562,33 @@ def compare_audits(before: Dict, after: Dict):
 
 
 
+# def format_scholarship_json(scholarship_list, output_language="en"):
+#     formatted_list = []
+#     non_translatable = {
+#         "Email", "Website", "Phone", "Postal Code",
+#         "Epost", "Websida", "Telefon", "Postnr",
+#         "Municipality", "Kommun",
+#         "City", "Stad",
+#         "County", "Län",
+#         "Main Address", "Huvudadress",
+#     }
+#     for sch in scholarship_list:
+#         entry = {}
+#         for k, v in sch.items():
+#             if k in ["Base Score", "Relevance Score", "Entity Bonus", "Adjusted Score"]:
+#                 continue
+#             final_k = FIELD_MAP_SV.get(k, k) if output_language.lower() == "sv" else k
+#             if k in non_translatable or not isinstance(v, str):
+#                 entry[final_k] = v
+#             else:
+#                 entry[final_k] = (
+#                     safe_translate(v, "sv", "en")
+#                     if output_language.lower() == "en"
+#                     else v
+#                 )
+#         formatted_list.append(entry)
+#     return formatted_list
+    #return json.dumps(formatted_list, indent=4, ensure_ascii=False)
 def format_scholarship_json(scholarship_list, output_language="en"):
     formatted_list = []
     non_translatable = {
@@ -3552,6 +3604,15 @@ def format_scholarship_json(scholarship_list, output_language="en"):
         for k, v in sch.items():
             if k in ["Base Score", "Relevance Score", "Entity Bonus", "Adjusted Score"]:
                 continue
+            
+            # Always render Assets as integer — DB stores as float e.g. 7235778.0
+            if k in ("Assets", "Tillgångar"):
+                try:
+                    entry[FIELD_MAP_SV.get(k, k) if output_language.lower() == "sv" else k] = int(float(v)) if v else v
+                except (ValueError, TypeError):
+                    entry[FIELD_MAP_SV.get(k, k) if output_language.lower() == "sv" else k] = v
+                continue
+            
             final_k = FIELD_MAP_SV.get(k, k) if output_language.lower() == "sv" else k
             if k in non_translatable or not isinstance(v, str):
                 entry[final_k] = v
@@ -3563,7 +3624,6 @@ def format_scholarship_json(scholarship_list, output_language="en"):
                 )
         formatted_list.append(entry)
     return formatted_list
-    #return json.dumps(formatted_list, indent=4, ensure_ascii=False)
 
 
 def get_predefined_scholarships_by_level(predefined_queryset, study_level=None, subject=None, role=None, sport=None, debug=False):

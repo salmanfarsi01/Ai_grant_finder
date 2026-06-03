@@ -34,6 +34,49 @@ from .models import ScholarshipApplicant, Review, FAQ, Coupon, PreDefinedScholar
 from deep_translator import GoogleTranslator
 import re
 
+# Unicode cleaning regex and replacement map for PDF rendering
+_BOX_CLEAN = re.compile(
+    r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'
+    r'\u2B1B\u2B1C\u2B50\u2B55'
+    r'\u00AD\u200B\u200C\u200D\uFEFF'
+    r'\u2028\u2029'
+    r'\x00-\x08\x0B\x0C\x0E-\x1F]'
+)
+_BOX_REPLACE = {
+    '\u2018': "'", '\u2019': "'",
+    '\u201C': '"', '\u201D': '"',
+    '\u2013': '-', '\u2014': '-',
+    '\u2026': '...', '\u00AB': '"',
+    '\u00BB': '"', '\u00A0': ' ',
+    '\u2022': '-',
+}
+
+def _clean_raw(text):
+    """Remove problematic Unicode characters that cause black boxes in PDF"""
+    if not isinstance(text, str):
+        return text
+    text = _BOX_CLEAN.sub('', text)
+    for char, rep in _BOX_REPLACE.items():
+        text = text.replace(char, rep)
+    return text
+
+def clean_scholarship_data(scholarships):
+    """Recursively clean all string values in scholarship dictionaries"""
+    if isinstance(scholarships, list):
+        return [clean_scholarship_data(item) for item in scholarships]
+    elif isinstance(scholarships, dict):
+        cleaned = {}
+        for key, value in scholarships.items():
+            if isinstance(value, str):
+                cleaned[key] = _clean_raw(value)
+            elif isinstance(value, (list, dict)):
+                cleaned[key] = clean_scholarship_data(value)
+            else:
+                cleaned[key] = value
+        return cleaned
+    else:
+        return scholarships
+
 data = {
         "user_profile": {
             "name": "Anna Karlsson",
@@ -71,21 +114,76 @@ data = {
     }
 
 
+# def translate_field(text, target_language="en", source_language="sv", debug=False):
+#     """Translate text from Swedish to English using GoogleTranslator"""
+#     if not text or not isinstance(text, str):
+#         return text
+    
+#     # Only translate SV→EN (data is stored in Swedish)
+#     if target_language.lower() == "en" and source_language.lower() == "sv":
+#         try:
+#             translated = GoogleTranslator(source_language='sv', target_language='en').translate(text)
+#             return translated
+#         except Exception as e:
+#             print(f"[translate_field] ERROR translating: {e}")
+#             return text
+    
+#     # For any other direction, return unchanged
+#     return text
+
 def translate_field(text, target_language="en", source_language="sv", debug=False):
-    """Translate text from Swedish to English using GoogleTranslator"""
     if not text or not isinstance(text, str):
         return text
     
-    # Only translate SV→EN (data is stored in Swedish)
+    # Clean PDF-incompatible and invisible characters from source text
+    # BEFORE translation so they don't appear in either language output.
+    # U+25A0/U+25AA = black squares already in Pinecone raw data.
+    # Other chars cause rendering failures in PDF fonts.
+    import re
+    CLEAN_PATTERN = re.compile(
+        r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'  # black/white squares
+        r'\u2B1B\u2B1C\u2B50\u2B55'                      # other geometric shapes
+        r'\u00AD'                                          # soft hyphen
+        r'\u200B\u200C\u200D\uFEFF'                       # zero-width chars
+        r'\u2028\u2029'                                    # line/paragraph separators
+        r'\x00-\x08\x0B\x0C\x0E-\x1F]'                  # control characters
+    )
+    text = CLEAN_PATTERN.sub('', text)
+    
+    # Replace typographic chars PDF fonts struggle with
+    REPLACE_MAP = {
+        '\u2018': "'",    # left single quote
+        '\u2019': "'",    # right single quote
+        '\u201C': '"',    # left double quote
+        '\u201D': '"',    # right double quote
+        '\u2013': '-',    # en dash
+        '\u2014': '-',    # em dash
+        '\u2026': '...',  # ellipsis
+        '\u00AB': '"',    # left angle quote
+        '\u00BB': '"',    # right angle quote
+        '\u00A0': ' ',    # non-breaking space
+        '\u2022': '-',    # bullet
+    }
+    for char, replacement in REPLACE_MAP.items():
+        text = text.replace(char, replacement)
+    
+    # Now translate if needed
     if target_language.lower() == "en" and source_language.lower() == "sv":
         try:
-            translated = GoogleTranslator(source_language='sv', target_language='en').translate(text)
+            translated = GoogleTranslator(
+                source_language='sv', target_language='en'
+            ).translate(text)
+            # Apply same cleaning to translated output in case
+            # Google Translate introduces new special chars
+            if translated:
+                translated = CLEAN_PATTERN.sub('', translated)
+                for char, replacement in REPLACE_MAP.items():
+                    translated = translated.replace(char, replacement)
             return translated
         except Exception as e:
             print(f"[translate_field] ERROR translating: {e}")
             return text
     
-    # For any other direction, return unchanged
     return text
 
 
@@ -530,6 +628,9 @@ def generate_data(request):
     # Order: Predefined scholarships FIRST (always subject + specific subject), then AI results
     # This ensures "always" scholarships appear first, then subject-specific, then AI-matched
     total_result = predefined_scholarships_data + formatted_ai_results[:10-len(predefined_scholarships_data)]
+    
+    # Clean all Unicode characters that cause black boxes in PDF
+    total_result = clean_scholarship_data(total_result)
 
     if 'include_municipality_filter' in application.form_data:
                      application.form_data.pop('include_municipality_filter')
@@ -595,11 +696,12 @@ def generate_payment_link(request, email, method):
     PHD_PRICE = 599
     ORG_PRICE = 1599
     print(application.form_data)
-    if application.form_data.get('role', "").lower() in  'privatperson individual':
-
-            price = STD_PRICE
-    elif 'phd' in application.form_data.get('study_level', "").lower():
-            price = PHD_PRICE
+    
+    # Check PhD FIRST (before general individual check)
+    if application.form_data.get('role', "").lower() in ['privatperson', 'individual'] and 'phd' in application.form_data.get('study_level', "").lower():
+        price = PHD_PRICE
+    elif application.form_data.get('role', "").lower() in ['privatperson', 'individual']:
+        price = STD_PRICE
     else:
         price = ORG_PRICE
 
@@ -900,6 +1002,10 @@ def generate_data_playground(request):
         predefined_scholarships,
         output_language=application.form_data['language']
     )
+    
+    # Clean all Unicode characters that cause black boxes in PDF
+    total_result = clean_scholarship_data(total_result)
+    
     report_utils.create_pdf(
         # report_data,
         total_result,
