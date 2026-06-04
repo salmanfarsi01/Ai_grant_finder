@@ -32,6 +32,22 @@ class SiteConfigAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, v):
         return ["pinecone_updated"]
+    
+    def upload_to_pinecone(self, request, queryset):
+        """Manual action to upload Excel file to Pinecone"""
+        from threading import Thread
+        from app.embed1 import update_pinecone_embeddings
+        
+        for obj in queryset:
+            if obj.scholarships_db_file:
+                print(f"✓ Manual upload triggered for index: {obj.active_dataset_index_name}")
+                Thread(target=update_pinecone_embeddings).start()
+                self.message_user(request, f"✓ Upload started to index: {obj.active_dataset_index_name}")
+            else:
+                self.message_user(request, "❌ No Excel file selected. Please upload a file first.")
+    
+    upload_to_pinecone.short_description = "📤 Manual Upload: Upload Excel data to Pinecone"
+    actions = ['upload_to_pinecone']
 
     fieldsets = (
         ('System Settings', {

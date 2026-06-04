@@ -59,8 +59,20 @@ def update_pinecone_embeddings():
     df = df.fillna("").astype(str)
     print(f"Dataset loaded successfully with {len(df)} rows")
 
+    # Get index name from Django SiteConfig if available, otherwise use default
     index_name = "scholarships-index-latest"
-    index_name = "scholarships-index1"
+    try:
+        from django.conf import settings
+        from app.models import SiteConfig
+        site_config = SiteConfig.objects.first()
+        if site_config and site_config.active_dataset_index_name:
+            index_name = site_config.active_dataset_index_name
+            print(f"✓ Using custom index name from SiteConfig: {index_name}")
+        else:
+            print(f"✓ Using default index name: {index_name}")
+    except Exception as e:
+        print(f"Note: Could not load index name from SiteConfig, using default. Error: {e}")
+    
     embedding_dim = 1536  # text-embedding-3-small
 
 

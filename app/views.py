@@ -36,12 +36,22 @@ import re
 
 # Unicode cleaning regex and replacement map for PDF rendering
 _BOX_CLEAN = re.compile(
-    r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'
-    r'\u2B1B\u2B1C\u2B50\u2B55'
-    r'\u00AD\u200B\u200C\u200D\uFEFF'
-    r'\u2028\u2029'
-    r'\x00-\x08\x0B\x0C\x0E-\x1F]'
+    r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'  # Geometric shapes (filled/hollow boxes)
+    r'\u2500-\u257F'  # Box drawing characters
+    r'\u2580-\u259F'  # Block elements
+    r'\u2600-\u26FF'  # Miscellaneous symbols (stars, weather, etc.)
+    r'\u2B1B\u2B1C\u2B50\u2B55'  # Additional symbols
+    r'\u00AD\u200B\u200C\u200D\uFEFF'  # Soft hyphen, zero-width spaces, format characters
+    r'\u2028\u2029'  # Line/paragraph separators
+    r'\u061C\u200E\u200F'  # Bidirectional formatting
+    r'\x00-\x08\x0B\x0C\x0E-\x1F'  # Control characters (except tab, newline, carriage return)
+    r'\x7F-\x9F'  # DEL and extended control characters
+    r'\u0300-\u036F]'  # Combining diacritical marks
 )
+
+# Escape sequence patterns like _x0007_
+_ESCAPE_SEQ = re.compile(r'_x[0-9A-Fa-f]{4}_')
+
 _BOX_REPLACE = {
     '\u2018': "'", '\u2019': "'",
     '\u201C': '"', '\u201D': '"',
@@ -52,13 +62,70 @@ _BOX_REPLACE = {
 }
 
 def _clean_raw(text):
-    """Remove problematic Unicode characters that cause black boxes in PDF"""
+    """Remove problematic Unicode characters and escape sequences that cause issues in PDF"""
     if not isinstance(text, str):
         return text
+    
+    # Remove escape sequences like _x0007_
+    text = _ESCAPE_SEQ.sub('', text)
+    
+    # Remove problematic Unicode characters
     text = _BOX_CLEAN.sub('', text)
+    
+    # Replace special characters with safe equivalents
     for char, rep in _BOX_REPLACE.items():
         text = text.replace(char, rep)
+    
+    # Clean up excessive whitespace (multiple spaces/newlines)
+    text = re.sub(r'\s+', ' ', text).strip()
+    
     return text
+
+def clean_profile_for_pdf(form_data):
+    """
+    Clean form data before sending to PDF:
+    - Convert education_level_option/education_level_other to subject field
+    - Remove unwanted fields
+    - Return cleaned copy
+    """
+    from copy import deepcopy
+    
+    cleaned = deepcopy(form_data)
+    
+    # FIRST: Convert education_level_option or education_level_other to subject
+    subject_value = None
+    if 'education_level_option' in cleaned and cleaned['education_level_option']:
+        edu_opt = cleaned['education_level_option']
+        # Handle both list and string formats
+        if isinstance(edu_opt, list):
+            subject_value = ', '.join([str(s) for s in edu_opt if s])
+        else:
+            subject_value = str(edu_opt)
+    
+    if not subject_value and 'education_level_other' in cleaned and cleaned['education_level_other']:
+        subject_value = str(cleaned['education_level_other'])
+    
+    # Set subject field if we found a value
+    if subject_value:
+        cleaned['subject'] = subject_value
+    
+    # THEN: Remove unwanted fields
+    unwanted_fields = {
+        'elite_athlete', 'elitidrottare',
+        'sport', 'sport_name', 'sportnamn',
+        'education_level_option', 'education_level_other',
+        'include_municipality_filter',
+        'form_file', 'admin_check'
+    }
+    
+    for field in unwanted_fields:
+        cleaned.pop(field, None)
+    
+    # Remove subject if it's empty
+    if 'subject' in cleaned and not cleaned['subject']:
+        cleaned.pop('subject', None)
+    
+    return cleaned
 
 def clean_scholarship_data(scholarships):
     """Recursively clean all string values in scholarship dictionaries"""
@@ -76,42 +143,6 @@ def clean_scholarship_data(scholarships):
         return cleaned
     else:
         return scholarships
-
-data = {
-        "user_profile": {
-            "name": "Anna Karlsson",
-            "email": "anna@example.com",
-            "gender": "Kvinna",
-            "age": 23,
-            "level": "Universitet",
-            "athlete": "Nej",
-            "municipality": "Stockholm"
-        },
-        "eligible_scholarships": [
-            {
-                "Namn": "Knut och Alice Wallenbergs Stiftelse",
-                "Huvudadress": "Box 16066",
-                "Postnr": 10322,
-                "Postort": "STOCKHOLM",
-                "Telefon": "08-54501780",
-                "Län": "Stockholms län",
-                "Kommun": "Stockholm",
-                "Tillgångar": 6899855000,
-                "Ändamål": "Att främja vetenskaplig forskning och undervisnings- eller studieverksamhet av landsgagnelig innebörd...",
-            },
-            {
-                "Namn": "Nordea Sveriges Vinstandelsstiftelse",
-                "Huvudadress": "M514",
-                "Postnr": "105 71",
-                "Postort": "STOCKHOLM",
-                "Telefon": "010-1571863",
-                "Län": "Stockholms län",
-                "Kommun": "Stockholm",
-                "Tillgångar": 1990073000,
-                "Ändamål": "Stiftelsens ändamål skall vara att ge Nordea Bank Abp:s personal i Sverige delägarintresse...",
-            }
-        ]
-    }
 
 
 # def translate_field(text, target_language="en", source_language="sv", debug=False):
@@ -589,11 +620,10 @@ def generate_data(request):
             
             predefined_filtered = predefined
         else:
-            # Organization did NOT select a sport - use subject-filtered results from get_predefined_scholarships_by_level
-            # predefined_always and predefined_filtered are already correct from the function call above
-            # Just add is_organization filter
-            predefined_always = predefined_always.filter(is_organization=True)
-            predefined_filtered = predefined_filtered.filter(is_organization=True)
+            # Organization did NOT select a sport - only show "always" scholarships for organizations
+            # Do NOT show subject-filtered scholarships (those are for individuals)
+            predefined_always = PreDefinedScholarship.objects.filter(is_organization=True, sport='always')
+            predefined_filtered = PreDefinedScholarship.objects.none()  # No subject-specific scholarships for orgs without sport
         
         application.form_data['education_level_option'] = []
     else:
@@ -632,12 +662,12 @@ def generate_data(request):
     # Clean all Unicode characters that cause black boxes in PDF
     total_result = clean_scholarship_data(total_result)
 
-    if 'include_municipality_filter' in application.form_data:
-                     application.form_data.pop('include_municipality_filter')
+    # Clean form data before PDF (remove unwanted fields)
+    cleaned_form_data = clean_profile_for_pdf(application.form_data)
+    
     report_utils.create_pdf(
-        # report_data,
         total_result,
-        application.form_data,
+        cleaned_form_data,
         settings.WATERMARK_PATH,
         pdf_location
     )
@@ -969,11 +999,10 @@ def generate_data_playground(request):
             
             predefined_filtered = predefined
         else:
-            # Organization did NOT select a sport - use subject-filtered results from get_predefined_scholarships_by_level
-            # predefined_always and predefined_filtered are already correct from the function call above
-            # Just add is_organization filter
-            predefined_always = predefined_always.filter(is_organization=True)
-            predefined_filtered = predefined_filtered.filter(is_organization=True)
+            # Organization did NOT select a sport - only show "always" scholarships for organizations
+            # Do NOT show subject-filtered scholarships (those are for individuals)
+            predefined_always = PreDefinedScholarship.objects.filter(is_organization=True, sport='always')
+            predefined_filtered = PreDefinedScholarship.objects.none()  # No subject-specific scholarships for orgs without sport
         
         application.form_data['education_level_option'] = []
     else:
@@ -997,7 +1026,6 @@ def generate_data_playground(request):
     if 'include_municipality_filter' in application.form_data:
                      application.form_data.pop('include_municipality_filter')
 
-
     total_result = stipo54.format_scholarship_json(
         predefined_scholarships,
         output_language=application.form_data['language']
@@ -1006,10 +1034,12 @@ def generate_data_playground(request):
     # Clean all Unicode characters that cause black boxes in PDF
     total_result = clean_scholarship_data(total_result)
     
+    # Clean form data before PDF (remove unwanted fields)
+    cleaned_form_data = clean_profile_for_pdf(application.form_data)
+    
     report_utils.create_pdf(
-        # report_data,
         total_result,
-        application.form_data,
+        cleaned_form_data,
         settings.WATERMARK_PATH,
         pdf_location
     )

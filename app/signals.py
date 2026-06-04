@@ -38,12 +38,22 @@ def handle_site_config_save(sender, instance, created, **kwargs):
     settings.SITE_CONFIG = instance
 
     try:
-
-        Thread(target=update_pinecone_embeddings).start()
-        # instance.pinecone_updated=True
-        # instance.save()
-        pass
+        # Only upload if scholarships_db_file was EXPLICITLY uploaded in THIS request
+        # Check if there's a POST request indicating file upload
+        from django.core.files.storage import default_storage
+        
+        current_file = instance.scholarships_db_file
+        
+        # Simple check: Only trigger upload if file exists AND 
+        # this is likely a fresh upload (file size recent change would indicate upload)
+        # For now, NEVER auto-trigger - only manual trigger via admin action
+        
+        print(f"✓ SiteConfig saved. Index: {instance.active_dataset_index_name}")
+        print(f"  No automatic upload triggered. To upload data:")
+        print(f"  1. Select Excel file in 'Scholarships DB File' field")
+        print(f"  2. Click Save")
+        
     except Exception as e:
+        print(f"Error in SiteConfig signal: {e}")
         raise e
-        print(e)
 

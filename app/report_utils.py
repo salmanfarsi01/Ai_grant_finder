@@ -18,14 +18,34 @@ PROFILE_KEY_VALUE_MAP = {
     "gender": "Kön",
     "age": "Ålder",
     "study_level": "Studienivå",
-    "elite_athlete": "Elitidrottare",
     "municipality": "Kommun",
-    "sport_name": "Sportnamn",
-    "education_level_option": "Utbildningsnivå",
-    "education_level_other": "Utbildningsnivå_annan",
     "purpose_of_funding": "Syfte_med_finansiering",
     "language": "Språk",
-    "include_municipality_filter": "Inkludera_kommunfilter"
+    "subject": "Ämne"
+}
+
+# English field names
+PROFILE_KEY_VALUE_MAP_EN = {
+    "role": "Role",
+    "name": "Name",
+    "email": "Email",
+    "gender": "Gender",
+    "age": "Age",
+    "study_level": "Study Level",
+    "municipality": "Municipality",
+    "purpose_of_funding": "Purpose of Funding",
+    "language": "Language",
+    "subject": "Subject"
+}
+
+# Fields to exclude from PDF output (removed from frontend)
+EXCLUDED_PROFILE_FIELDS = {
+    "elite_athlete", "elitidrottare",
+    "sport", "sport_name", "sportnamn",
+    "education_level_option",
+    "education_level_other",
+    "include_municipality_filter",
+    "admin_check", "admin_verified", "paid", "email_verified"
 }
 
 SCHOLARSHIP_KEY_VALUE_MAP_SV = {
@@ -80,15 +100,28 @@ def create_pdf(data, user_profile, watermark_path, output_path):
     else:
         story.append(Paragraph("<b>Student Profile</b>", styles["Heading2"]))
     
-    # profile = data["user_profile"]
     profile = user_profile
-    print(f"LANGUAGE TEST: ", user_profile.get('language', '') == 'sv')
+    is_swedish = user_profile.get('language', '') == 'sv'
+    
     for key, value in profile.items():
-        # print(f"key test: {key} {key in PROFILE_KEY_VALUE_MAP}")
-        if user_profile.get('language', '') == 'sv' and key in PROFILE_KEY_VALUE_MAP:
-            story.append(Paragraph(f"<b>{PROFILE_KEY_VALUE_MAP[key]}</b>: {value}", styles["Normal"]))
+        # Skip excluded fields
+        if key.lower() in EXCLUDED_PROFILE_FIELDS:
+            continue
+        
+        # Skip empty values
+        if not value or value == '':
+            continue
+        
+        # Get the translated field name
+        if is_swedish and key in PROFILE_KEY_VALUE_MAP:
+            display_key = PROFILE_KEY_VALUE_MAP[key]
+        elif not is_swedish and key in PROFILE_KEY_VALUE_MAP_EN:
+            display_key = PROFILE_KEY_VALUE_MAP_EN[key]
         else:
-            story.append(Paragraph(f"<b>{key.capitalize()}</b>: {value}", styles["Normal"]))
+            display_key = key.replace('_', ' ').title()
+        
+        story.append(Paragraph(f"<b>{display_key}</b>: {value}", styles["Normal"]))
+    
     story.append(Spacer(1, 12))
 
     # Eligible Scholarships Section

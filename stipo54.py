@@ -36,12 +36,22 @@ MIN_RESULTS = 10
 enc = get_encoding("cl100k_base")
 
 _BOX_CLEAN = re.compile(
-    r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'
-    r'\u2B1B\u2B1C\u2B50\u2B55'
-    r'\u00AD\u200B\u200C\u200D\uFEFF'
-    r'\u2028\u2029'
-    r'\x00-\x08\x0B\x0C\x0E-\x1F]'
+    r'[\u25A0\u25AA\u25AB\u25FB\u25FC\u25FD\u25FE'  # Geometric shapes (filled/hollow boxes)
+    r'\u2500-\u257F'  # Box drawing characters
+    r'\u2580-\u259F'  # Block elements
+    r'\u2600-\u26FF'  # Miscellaneous symbols (stars, weather, etc.)
+    r'\u2B1B\u2B1C\u2B50\u2B55'  # Additional symbols
+    r'\u00AD\u200B\u200C\u200D\uFEFF'  # Soft hyphen, zero-width spaces, format characters
+    r'\u2028\u2029'  # Line/paragraph separators
+    r'\u061C\u200E\u200F'  # Bidirectional formatting
+    r'\x00-\x08\x0B\x0C\x0E-\x1F'  # Control characters (except tab, newline, carriage return)
+    r'\x7F-\x9F'  # DEL and extended control characters
+    r'\u0300-\u036F]'  # Combining diacritical marks
 )
+
+# Escape sequence patterns like _x0007_
+_ESCAPE_SEQ = re.compile(r'_x[0-9A-Fa-f]{4}_')
+
 _BOX_REPLACE = {
     '\u2018': "'", '\u2019': "'",
     '\u201C': '"', '\u201D': '"',
@@ -54,9 +64,20 @@ _BOX_REPLACE = {
 def _clean_raw(text):
     if not isinstance(text, str):
         return text
+    
+    # Remove escape sequences like _x0007_
+    text = _ESCAPE_SEQ.sub('', text)
+    
+    # Remove problematic Unicode characters
     text = _BOX_CLEAN.sub('', text)
+    
+    # Replace special characters with safe equivalents
     for char, rep in _BOX_REPLACE.items():
         text = text.replace(char, rep)
+    
+    # Clean up excessive whitespace (multiple spaces/newlines)
+    text = re.sub(r'\s+', ' ', text).strip()
+    
     return text
 
 
