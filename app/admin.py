@@ -55,7 +55,7 @@ class SiteConfigAdmin(admin.ModelAdmin):
             'description': 'Basic system configuration'
         }),
         ('Dataset Management', {
-            'fields': ('use_default_dataset', 'active_dataset_index_name', 'available_dataset_indices'),
+            'fields': ('use_default_dataset', 'active_dataset_index_name'),
             'description': 'Manage scholarship dataset indices. Check "Use Default Dataset Index" to use the hardcoded default index "scholarships-index-latest" from stipo54.py. Uncheck to use a custom dataset index.'
         }),
         ('Custom LLM Filter Prompt - Individual Users', {

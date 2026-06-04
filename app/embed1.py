@@ -15,7 +15,7 @@ from deep_translator import GoogleTranslator
 from openai import OpenAI
 from fuzzywuzzy import fuzz
 
-def update_pinecone_embeddings():
+def update_pinecone_embeddings(file_path=None, index_name=None):
 
     def load_env_variables():
         """Load API keys directly from .env file by parsing it manually."""
@@ -55,23 +55,30 @@ def update_pinecone_embeddings():
     openai = OpenAI(api_key=OPENAI_API_KEY)
     pc = Pinecone(api_key=PINECONE_API_KEY)
 
-    df = pd.read_excel("reports/new_scholarships_db.xlsx", engine="openpyxl")
+    # Use provided file path or default
+    if not file_path:
+        file_path = "reports/new_scholarships_db.xlsx"
+    
+    df = pd.read_excel(file_path, engine="openpyxl")
     df = df.fillna("").astype(str)
-    print(f"Dataset loaded successfully with {len(df)} rows")
+    print(f"Dataset loaded successfully from {file_path} with {len(df)} rows")
 
-    # Get index name from Django SiteConfig if available, otherwise use default
-    index_name = "scholarships-index-latest"
-    try:
-        from django.conf import settings
-        from app.models import SiteConfig
-        site_config = SiteConfig.objects.first()
-        if site_config and site_config.active_dataset_index_name:
-            index_name = site_config.active_dataset_index_name
-            print(f"✓ Using custom index name from SiteConfig: {index_name}")
-        else:
-            print(f"✓ Using default index name: {index_name}")
-    except Exception as e:
-        print(f"Note: Could not load index name from SiteConfig, using default. Error: {e}")
+    # Use provided index_name, or get from SiteConfig, or use default
+    if not index_name:
+        index_name = "scholarships-index-latest"
+        try:
+            from django.conf import settings
+            from app.models import SiteConfig
+            site_config = SiteConfig.objects.first()
+            if site_config and site_config.active_dataset_index_name:
+                index_name = site_config.active_dataset_index_name
+                print(f"✓ Using custom index name from SiteConfig: {index_name}")
+            else:
+                print(f"✓ Using default index name: {index_name}")
+        except Exception as e:
+            print(f"Note: Could not load index name from SiteConfig, using default. Error: {e}")
+    else:
+        print(f"✓ Using provided index name: {index_name}")
     
     embedding_dim = 1536  # text-embedding-3-small
 
@@ -185,4 +192,18 @@ def update_pinecone_embeddings():
 
     print("\nAll embeddings uploaded successfully!")
     print("=" * 60)
+    
+    # Update SiteConfig to mark upload as complete
+    try:
+        from app.models import SiteConfig
+        site_config = SiteConfig.objects.first()
+        if site_config:
+            site_config.pinecone_updated = True
+            site_config.save()
+            print(f"\n✅ SUCCESS: Dataset uploaded to Pinecone index '{index_name}'")
+            print(f"   Pinecone updated flag set to TRUE")
+            print(f"   You can now query this index for scholarships")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not update SiteConfig status: {e}")
+
 

@@ -41,6 +41,8 @@ class SiteConfig(models.Model):
     admin_check = models.BooleanField(default=True)
     scholarships_db_file = models.FileField(upload_to=scholarship_db_path, null=True)
     pinecone_updated = models.BooleanField(default=False)
+    upload_in_progress = models.BooleanField(default=False, help_text="Tracks if an upload is currently running to prevent duplicate uploads")
+    last_active_dataset_index = models.CharField(max_length=255, default="scholarships-index-latest", help_text="Previous active index to detect when user changes it")
 
     query_template = models.TextField(
         verbose_name="LLM filter system prompt",
