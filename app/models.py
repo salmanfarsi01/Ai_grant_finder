@@ -296,8 +296,26 @@ def random_string():
 
 class Coupon(models.Model):
     discount = models.PositiveIntegerField(default=0)
-    code = models.CharField(max_length=7, default=random_string, blank=True, null=True)
-# class Database(models.Model):
+    code = models.CharField(max_length=7, default=random_string, blank=True, null=True, unique=True)
+    
+    # Usage tracking
+    times_used = models.PositiveIntegerField(default=0, help_text="Number of times this coupon has been used")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When the coupon was created")
+    last_used = models.DateTimeField(null=True, blank=True, help_text="Last time this coupon was used")
+    
+    is_active = models.BooleanField(default=True, help_text="Enable/disable this coupon")
+    max_uses = models.PositiveIntegerField(null=True, blank=True, help_text="Maximum times coupon can be used (leave blank for unlimited)")
+    
+    def __str__(self):
+        return f"Coupon {self.code} ({self.discount}%)"
+    
+    def is_usable(self):
+        """Check if coupon can still be used"""
+        if not self.is_active:
+            return False
+        if self.max_uses and self.times_used >= self.max_uses:
+            return False
+        return True
 
 
 SPORT_CHOICES = [

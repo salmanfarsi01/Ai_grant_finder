@@ -860,12 +860,23 @@ def generate_payment_link(request, email, method):
 
     if coupon:
         if cpn:=Coupon.objects.filter(code=coupon).first():
+            # Check if coupon is usable
+            if not cpn.is_usable():
+                raise ValidationError({"error": "this coupon is no longer available"})
+            
             print(cpn)
             print(cpn.discount)
             discount = cpn.discount
+            
+            # Track coupon usage
+            import django.utils.timezone as tz
+            cpn.times_used += 1
+            cpn.last_used = tz.now()
+            cpn.save()
+            print(f"✓ Coupon {cpn.code} used (Total uses: {cpn.times_used})")
         else:
             print(coupon)
-            raise ValidationError({"error": "invalid copuon"})
+            raise ValidationError({"error": "invalid coupon"})
 
     SITE_CONFIG = settings.SITE_CONFIG
     success_url = request.data.get('success_url')

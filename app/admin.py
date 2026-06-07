@@ -108,10 +108,43 @@ class ScholarshipApplicant(admin.ModelAdmin):
 
 @admin.register(Coupon)
 class CouponAdmin(admin.ModelAdmin):
-    def get_readonly_fields(self, request, obj=None):
-        return [
-            "code"
-        ]
+    list_display = ('code', 'discount', 'times_used', 'max_uses', 'is_active', 'last_used', 'usage_percentage')
+    list_filter = ('is_active', 'created_at', 'last_used')
+    search_fields = ('code',)
+    readonly_fields = ('code', 'times_used', 'created_at', 'last_used', 'usage_percentage', 'is_usable_status')
+    
+    fieldsets = (
+        ('Coupon Info', {
+            'fields': ('code', 'discount', 'is_active')
+        }),
+        ('Usage Limits', {
+            'fields': ('max_uses', 'times_used', 'usage_percentage')
+        }),
+        ('Tracking', {
+            'fields': ('created_at', 'last_used', 'is_usable_status')
+        }),
+    )
+    
+    def usage_percentage(self, obj):
+        """Display coupon usage percentage"""
+        if obj.max_uses is None:
+            return "Unlimited"
+        if obj.max_uses == 0:
+            return "0%"
+        percentage = (obj.times_used / obj.max_uses) * 100
+        return f"{percentage:.1f}% ({obj.times_used}/{obj.max_uses})"
+    usage_percentage.short_description = "Usage"
+    
+    def is_usable_status(self, obj):
+        """Show if coupon is still usable"""
+        if obj.is_usable():
+            return "✅ Active & Usable"
+        elif not obj.is_active:
+            return "🔴 Disabled"
+        elif obj.max_uses and obj.times_used >= obj.max_uses:
+            return f"🛑 Limit Reached ({obj.times_used}/{obj.max_uses})"
+        return "⚠️ Unavailable"
+    is_usable_status.short_description = "Status"
 
 
 @admin.register(PreDefinedScholarship)
