@@ -80,6 +80,11 @@ def update_pinecone_embeddings(file_path=None, index_name=None):
     else:
         print(f"✓ Using provided index name: {index_name}")
     
+    # Sanitize index name for Pinecone (underscores → hyphens, lowercase)
+    # Pinecone requires: lowercase alphanumeric characters or '-' only
+    index_name = index_name.replace('_', '-').lower()
+    print(f"✓ Sanitized index name for Pinecone: {index_name}")
+    
     embedding_dim = 1536  # text-embedding-3-small
 
 

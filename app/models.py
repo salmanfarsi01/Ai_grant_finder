@@ -256,10 +256,18 @@ Example: ["Scholarship A", "Scholarship B", "Scholarship C"]""",
         Return the active dataset index name.
         - If use_default_dataset is True → return "scholarships-index-latest" (hardcoded default)
         - If use_default_dataset is False → return the configured active_dataset_index_name
+        
+        NOTE: Automatically converts underscores to hyphens for Pinecone compatibility
+        (Pinecone only allows: lowercase alphanumeric and hyphens)
         """
         if self.use_default_dataset:
             return "scholarships-index-latest"  # Signal to use hardcoded default from stipo54.py
-        return self.active_dataset_index_name.strip() if self.active_dataset_index_name else "scholarships-index-latest"
+        
+        index_name = self.active_dataset_index_name.strip() if self.active_dataset_index_name else "scholarships-index-latest"
+        # Convert underscores to hyphens for Pinecone compatibility
+        # Pinecone requires: lowercase alphanumeric characters or '-' only
+        index_name = index_name.replace('_', '-').lower()
+        return index_name
 
 
 class FAQ(models.Model):
@@ -357,6 +365,13 @@ class PreDefinedScholarship(models.Model):
         ("law_llm", "Law (LL.M / Legal Studies)"),
         ("design_creative_advanced", "Design, Architecture & Creative Arts"),
         ("social_sciences", "Social Sciences (Psychology, Social Work, Political Science)"),
+        
+        # PhD/DOCTORAL subjects
+        ("phd_engineering_technology", "Engineering/Technology | Teknik och ingenjörsvetenskap"),
+        ("phd_economics", "Economics | Ekonomi"),
+        ("phd_medicine", "Medicine | Medicin"),
+        ("phd_law", "Law | Juridik"),
+        ("phd_arts_culture", "Arts/Culture | Konst/Kultur"),
     ])
 
     # study_level = models.CharField(choices=[

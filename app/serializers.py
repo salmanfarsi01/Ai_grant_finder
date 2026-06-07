@@ -66,7 +66,15 @@ SUBJECT_TRANSLATIONS = {
     "law_llm": "Juridik (LL.M / Juridiska studier)",
     "design_creative_advanced": "Design, arkitektur & konst",
     "social_sciences": "Samhällsvetenskap (psykologi, socialt arbete, statsvetenskap)",
+    
+    # PhD/Doctoral subjects
+    "phd_engineering_technology": "Teknik och ingenjörsvetenskap",
+    "phd_economics": "Ekonomi",
+    "phd_medicine": "Medicin",
+    "phd_law": "Juridik",
+    "phd_arts_culture": "Konst/Kultur",
 }
+
 
 # Reverse mapping (Swedish -> English) for translating FROM Swedish to English
 SUBJECT_TRANSLATIONS_REVERSE = {v: k for k, v in SUBJECT_TRANSLATIONS.items()}

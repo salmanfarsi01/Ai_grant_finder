@@ -81,16 +81,140 @@ def _clean_raw(text):
     
     return text
 
+def normalize_form_data(form_data):
+    """Normalize form_data on submission - maps municipality to proper case"""
+    from copy import deepcopy
+    from stipo54 import MUNICIPALITY_NAME_MAP
+    
+    normalized = deepcopy(form_data)
+    
+    # Normalize municipality name through MUNICIPALITY_NAME_MAP
+    if 'municipality' in normalized and normalized['municipality']:
+        municipality = normalized['municipality'].lower().strip()
+        # Look up in map (key is lowercase, value is proper case)
+        if municipality in MUNICIPALITY_NAME_MAP:
+            normalized['municipality'] = MUNICIPALITY_NAME_MAP[municipality]
+    
+    return normalized
+
+
+def translate_study_level(study_level_text, language='sv'):
+    """Translate study level display name based on language
+    Example: 'Doktorandstudier' → 'PhD/Doctoral Studies' (en) or stays 'Doktorandstudier' (sv)
+    """
+    if not study_level_text or not isinstance(study_level_text, str):
+        return study_level_text
+    
+    text_lower = study_level_text.lower()
+    
+    # Detect PhD level
+    if any(t in text_lower for t in ['phd', 'doctoral', 'doktorand', 'forskarutbildning', 'doktorsexamen']):
+        return 'PhD/Doctoral Studies' if language == 'en' else 'Doktorandstudier'
+    # Detect Master level
+    elif any(t in text_lower for t in ['master', 'magister', 'masternivå']):
+        return "Master's Studies" if language == 'en' else 'Masterexamen'
+    # Detect Bachelor level
+    elif any(t in text_lower for t in ['bachelor', 'kandidat', 'grundnivå', 'kandidatnivå']):
+        return 'Bachelor Studies' if language == 'en' else 'Kandidatexamen'
+    
+    return study_level_text
+
+
+def map_subject_for_phd_display(subject, language='sv'):
+    """Map subject to PhD category
+    Converts subjects to standard PhD categories for display
+    Example: 'Teknik' → 'Teknik och ingenjörsvetenskap' (sv) or 'Engineering/Technology' (en)
+    """
+    if not subject or not isinstance(subject, str):
+        return subject
+    
+    subject_lower = subject.lower().strip()
+    
+    # PhD Subject Categories mapping
+    phd_categories = {
+        'sv': {
+            'teknik': 'Teknik och ingenjörsvetenskap',
+            'teknologi': 'Teknik och ingenjörsvetenskap',
+            'ingenjörsvetenskap': 'Teknik och ingenjörsvetenskap',
+            'engineering': 'Teknik och ingenjörsvetenskap',
+            'technology': 'Teknik och ingenjörsvetenskap',
+            
+            'ekonomi': 'Ekonomi',
+            'economics': 'Ekonomi',
+            'business': 'Ekonomi',
+            'företagsekonomi': 'Ekonomi',
+            
+            'medicin': 'Medicin',
+            'medicine': 'Medicin',
+            'hälsa': 'Medicin',
+            'health': 'Medicin',
+            
+            'juridik': 'Juridik',
+            'law': 'Juridik',
+            'legal': 'Juridik',
+            
+            'konst': 'Konst/Kultur',
+            'kultur': 'Konst/Kultur',
+            'arts': 'Konst/Kultur',
+            'culture': 'Konst/Kultur',
+        },
+        'en': {
+            'teknik': 'Engineering/Technology',
+            'teknologi': 'Engineering/Technology',
+            'ingenjörsvetenskap': 'Engineering/Technology',
+            'engineering': 'Engineering/Technology',
+            'technology': 'Engineering/Technology',
+            
+            'ekonomi': 'Economics',
+            'economics': 'Economics',
+            'business': 'Economics',
+            'företagsekonomi': 'Economics',
+            
+            'medicin': 'Medicine',
+            'medicine': 'Medicine',
+            'hälsa': 'Medicine',
+            'health': 'Medicine',
+            
+            'juridik': 'Law',
+            'law': 'Law',
+            'legal': 'Law',
+            
+            'konst': 'Arts/Culture',
+            'kultur': 'Arts/Culture',
+            'arts': 'Arts/Culture',
+            'culture': 'Arts/Culture',
+        }
+    }
+    
+    # Get the appropriate language mapping
+    lang_code = 'en' if language == 'en' else 'sv'
+    categories = phd_categories.get(lang_code, {})
+    
+    # Check if subject matches any PhD category keyword
+    for keyword, category in categories.items():
+        if keyword in subject_lower:
+            return category
+    
+    # If no match found, return original
+    return subject
+
+
+
 def clean_profile_for_pdf(form_data):
     """
     Clean form data before sending to PDF:
     - Convert education_level_option/education_level_other to subject field
+    - Map municipality names through MUNICIPALITY_NAME_MAP for proper display
+    - Translate study level to proper display name
+    - For PhD users: map subject to PhD category (e.g., Teknik → Teknik och ingenjörsvetenskap)
     - Remove unwanted fields
     - Return cleaned copy
     """
     from copy import deepcopy
+    from stipo54 import MUNICIPALITY_NAME_MAP
     
     cleaned = deepcopy(form_data)
+    language = cleaned.get('language', 'sv')
     
     # FIRST: Convert education_level_option or education_level_other to subject
     subject_value = None
@@ -108,6 +232,24 @@ def clean_profile_for_pdf(form_data):
     # Set subject field if we found a value
     if subject_value:
         cleaned['subject'] = subject_value
+    
+    # Map municipality name through MUNICIPALITY_NAME_MAP for proper display (Västervik not vastervik)
+    if 'municipality' in cleaned and cleaned['municipality']:
+        municipality = cleaned['municipality'].lower().strip()
+        # Look up in map (key is lowercase, value is proper case)
+        if municipality in MUNICIPALITY_NAME_MAP:
+            cleaned['municipality'] = MUNICIPALITY_NAME_MAP[municipality]
+    
+    # Translate study_level to proper display name
+    if 'study_level' in cleaned and cleaned['study_level']:
+        study_level_translated = translate_study_level(cleaned['study_level'], language)
+        cleaned['study_level'] = study_level_translated
+        
+        # For PhD level users: map subject to PhD category
+        study_level_lower = cleaned['study_level'].lower()
+        if any(t in study_level_lower for t in ['phd', 'doctoral']):
+            if 'subject' in cleaned and cleaned['subject']:
+                cleaned['subject'] = map_subject_for_phd_display(cleaned['subject'], language)
     
     # THEN: Remove unwanted fields
     unwanted_fields = {
@@ -287,6 +429,9 @@ def submit_application(request):
 
     email = request.data.get('email')
     form_data = request.data
+    
+    # Normalize municipality and other form fields on submission
+    form_data = normalize_form_data(form_data)
 
     # if application_type in ('organization', 'Organisation'):
     #     profile = {
@@ -560,8 +705,28 @@ def generate_data(request):
         elif _matches_any(education_str, ['social science', 'social work', 'psychology', 'political science', 'samhällsvetenskap', 'socialt', 'psykologi']):
             subject = 'social_sciences'
 
-        elif detected_level == 'phd':
-            # PhD has no subject filtering — always scholarships only
+    elif detected_level == 'phd':
+        # PhD subject mapping - only apply if user is individual
+        # For individual PhD students, filter by subject
+        is_individual = application.form_data['role'] and application.form_data['role'].lower() in ['individual', 'privatperson']
+        
+        if is_individual:
+            # PhD subject mapping → phd DB keys
+            if _matches_any(education_str, ['engineering', 'technology', 'teknik', 'ingenjörsvetenskap']):
+                subject = 'phd_engineering_technology'
+            elif _matches_any(education_str, ['economics', 'business', 'ekonomi', 'företagsekonomi']):
+                subject = 'phd_economics'
+            elif _matches_any(education_str, ['medicine', 'medicin', 'health', 'hälsa']):
+                subject = 'phd_medicine'
+            elif _matches_any(education_str, ['law', 'juridik', 'legal']):
+                subject = 'phd_law'
+            elif _matches_any(education_str, ['arts', 'culture', 'kultur', 'konst', 'creative', 'kreativa']):
+                subject = 'phd_arts_culture'
+            else:
+                # If user selected something but no PhD match, only show "always" scholarships
+                subject = None
+        else:
+            # For organization PhD applicants, no subject filtering
             subject = None
 
     print(f"\n[SUBJECT MAPPING DEBUG]")
@@ -721,14 +886,20 @@ def generate_payment_link(request, email, method):
     stripe.api_key = os.environ['STRIPE_SECRET_KEY']
     # stripe.api_key = "sk_test_51OXdHWFvvW23GozqQWzgshPAf66cX6EhWQ8MBpEoLaZiEBMZKNmgLR0zYUZfedZXwDEVJN3mcSFOG3OlPk2KGeiw00gm81YC9z"
     
+    # Detect study level for accurate PhD pricing (handles Swedish terms like "Doktorsexamen")
+    study_level = application.form_data.get('study_level', '').lower()
+    if any(t in study_level for t in ['phd', 'doctoral', 'doktorand', 'forskarutbildning', 'doktorsexamen', 'licentiat']):
+        detected_level = 'phd'
+    else:
+        detected_level = 'other'
 
     STD_PRICE = 299
     PHD_PRICE = 599
     ORG_PRICE = 1599
     print(application.form_data)
     
-    # Check PhD FIRST (before general individual check)
-    if application.form_data.get('role', "").lower() in ['privatperson', 'individual'] and 'phd' in application.form_data.get('study_level', "").lower():
+    # Check PhD FIRST (before general individual check) — use detected_level for accurate Swedish support
+    if application.form_data.get('role', "").lower() in ['privatperson', 'individual'] and detected_level == 'phd':
         price = PHD_PRICE
     elif application.form_data.get('role', "").lower() in ['privatperson', 'individual']:
         price = STD_PRICE
