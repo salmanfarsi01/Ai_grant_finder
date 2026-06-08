@@ -413,38 +413,3 @@ class PreDefinedScholarship(models.Model):
     organization_postal_code = models.TextField()
     organization_city = models.TextField()
     organization_county = models.TextField()
-
-
-class PreDefinedScholarship_Sv(models.Model):
-    subject = models.CharField(choices=(
-    
-    ))
-    study_level = models.CharField(choices=(
-        
-    ))
-    organization_name = models.TextField()
-    munucipality = models.TextField()
-    category = models.TextField()
-    purpose = models.TextField()
-    organization_email = models.TextField()
-    organization_website = models.TextField()
-    organization_phone = models.TextField()
-    organization_assets = models.TextField()
-    organization_main_address = models.TextField()
-    organization_postal_code = models.TextField()
-    organization_city = models.TextField()
-    organization_county = models.TextField()
-    
-    # "Name": "Namn",
-    # "Municipality": "Kommun",
-    # "Category": "Kategori",
-    # "Purpose": "Ändamål",
-    # "Study Level": "Studienivå",
-    # "Email": "E-post",
-    # "Website": "Websida",
-    # "Phone": "Telefon",
-    # "Assets": "Tillgångar",
-    # "Main Address": "Huvudadress",
-    # "Postal Code": "Postnummer",
-    # "City": "Postort",
-    # "County": "Län",
