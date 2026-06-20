@@ -31,7 +31,6 @@ dependencies = [
 	"pinecone-client",
 	"langchain-openai",
 	"python-dotenv",
-	"langchain-pinecone",
 	"deep-translator",
 	"python-Levenshtein",
 ]

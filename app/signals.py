@@ -1,3 +1,5 @@
+import os as _os
+
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.core.mail import EmailMessage
@@ -9,27 +11,51 @@ from app.embed1 import update_pinecone_embeddings
 
 @receiver(post_save, sender=ScholarshipApplicant)
 def handle_application_save(sender, instance, created, **kwargs):
-    if instance.admin_verified and instance.report_file\
+    """
+    After all conditions are met (admin_verified, email_verified, paid, report_file exists):
+      1. Read the PDF from disk and email it to the customer.
+      2. Delete the physical PDF file from disk immediately — no second copy retained.
+      3. Clear the report_file field in the DB — keeping form_data and success_count.
+
+    The DB record is intentionally preserved so form input data and scholarship
+    results remain queryable. Only the PDF binary is discarded.
+    """
+    if instance.admin_verified and instance.report_file \
             and instance.email_verified and instance.paid:
 
+        pdf_path = instance.report_file.path
+
+        # --- 1. Build and send the email ---
         subject = "Alegable Scholarships"
         body = ""
-        email = EmailMessage(
+        email_msg = EmailMessage(
             subject=subject,
             body=body,
             from_email=settings.EMAIL_HOST_USER,
             to=[instance.email],
         )
-        pdf_path = instance.report_file.path
         with open(pdf_path, "rb") as pdf:
-            email.attach("document.pdf", pdf.read(), "application/pdf")
+            email_msg.attach("document.pdf", pdf.read(), "application/pdf")
 
-        # Send the email
         print("SENDING FILE>>>")
-        print("SENDING FILE>>>")
-        email.send()
-        instance.delete()
-    pass
+        email_msg.send()
+        print(f"PDF emailed to {instance.email}")
+
+        # --- 2. Delete the physical file from disk immediately ---
+        try:
+            _os.remove(pdf_path)
+            print(f"Physical PDF deleted: {pdf_path}")
+        except OSError as exc:
+            print(f"Could not delete physical PDF ({pdf_path}): {exc}")
+
+        # --- 3. Clear report_file field in DB (keep the record with form_data) ---
+        # Use .update() to avoid re-triggering this post_save signal.
+        ScholarshipApplicant.objects.filter(pk=instance.pk).update(
+            report_file="",
+            pdf_created_at=None,
+        )
+        print(f"report_file cleared for {instance.email} — form_data and results retained.")
+
 
 from threading import Thread
 from django.db.models import F

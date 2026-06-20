@@ -12,7 +12,6 @@ from pinecone import Pinecone, ServerlessSpec
 from openai import OpenAI
 from tiktoken import get_encoding
 from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
 from dotenv import load_dotenv
 import numpy as np
 
@@ -1084,7 +1083,6 @@ from pinecone import Pinecone, ServerlessSpec
 from openai import OpenAI
 from tiktoken import get_encoding
 from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
 from dotenv import load_dotenv
 import numpy as np
 

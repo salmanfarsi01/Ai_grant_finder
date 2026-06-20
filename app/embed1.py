@@ -10,7 +10,6 @@ from pinecone import Pinecone, ServerlessSpec
 import time
 from tiktoken import get_encoding
 from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
 from deep_translator import GoogleTranslator
 from openai import OpenAI
 from fuzzywuzzy import fuzz

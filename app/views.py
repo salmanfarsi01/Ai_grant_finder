@@ -448,10 +448,20 @@ def submit_application(request):
     application.admin_verified = bool(SITE_CONFIG and not SITE_CONFIG.admin_check)
     application.email_verified = False
     print("DEBUG ADMIN VER...: ", application.admin_verified)
+    otp_html = f"""
+    <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+        <h2>Email Verification Code</h2>
+        <p>Your one-time password (OTP) is:</p>
+        <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
+            {application.otp}
+        </div>
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">This code is required to submit your application. Please do not share it with anyone.</p>
+    </div>
+    """
     send_mail(
-        subject="Application submitted",
-        message=f"plz use the otp: {application.otp}",
-        html_message="",
+        subject="Your Application Verification Code",
+        message=f"Please use the following OTP to verify your application: {application.otp}",
+        html_message=otp_html,
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[application.email]
     )
@@ -474,10 +484,20 @@ def submit_application(request):
 def send_verification_code(request, email):
     # email = request.data.get('email')
     application = get_object_or_404(ScholarshipApplicant, email=email)
+    otp_html = f"""
+    <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+        <h2>Email Verification Code</h2>
+        <p>Your one-time password (OTP) is:</p>
+        <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
+            {application.otp}
+        </div>
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">This code is required to submit your application. Please do not share it with anyone.</p>
+    </div>
+    """
     send_mail(
-        subject="Application submitted",
-        message=f"here is your otp: {application.otp}",
-        html_message=f"here is your otp: {application.otp}",
+        subject="Your Application Verification Code",
+        message=f"Please use the following OTP to verify your application: {application.otp}",
+        html_message=otp_html,
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[email]
     )
@@ -517,7 +537,7 @@ def verify_otp(request):
     verify_token = jwt.encode({
             'email': application.email,
             "exp": datetime.datetime.now(datetime.UTC)\
-                   +datetime.timedelta(minutes=500),
+                   +datetime.timedelta(minutes=30),
         },
         settings.SECRET_KEY,
         algorithm='HS256'
@@ -841,6 +861,7 @@ def generate_data(request):
         application.report_file.save(application.email, File(file), save=True)
 
     application.success_count = len(total_result)
+    application.pdf_created_at = datetime.datetime.now(datetime.UTC)
     application.save()
     os.remove(pdf_location)
     message = ""
