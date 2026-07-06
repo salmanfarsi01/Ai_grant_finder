@@ -1,4 +1,5 @@
 python-dotenv
+django-anymail[postmark]
 django
 djangorestframework
 httpx
@@ -17,8 +18,8 @@ pinecone
 sentence-transformers
 tqdm
 langchain-openai
-langchain-pinecone
 fuzzywuzzy
 tiktoken
 pydantic 
 setuptools
+psycopg[binary]

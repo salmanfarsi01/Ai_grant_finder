@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 import random
 import uuid
@@ -19,7 +20,8 @@ class ScholarshipApplicant(models.Model):
     paid = models.BooleanField(default=False) 
     email_verified = models.BooleanField(default=False)
     admin_verified = models.BooleanField(default=False)
-    report_file = models.FileField(upload_to=generate_pdf_path, null=True)
+    report_file = models.FileField(upload_to=generate_pdf_path, null=True, blank=True)
+    pdf_created_at = models.DateTimeField(null=True, blank=True, help_text="When the PDF was generated. Used for 24-hour auto-deletion.")
     otp = models.CharField(default=create_otp)
     success_count = models.PositiveIntegerField(default=0)
 
@@ -364,7 +366,11 @@ class Coupon(models.Model):
     
     # Usage tracking
     times_used = models.PositiveIntegerField(default=0, help_text="Number of times this coupon has been used")
+<<<<<<< HEAD
     created_at = models.DateTimeField(auto_now_add=True, null=True, help_text="When the coupon was created")
+=======
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True, help_text="When the coupon was created")
+>>>>>>> 7a07bb29e8c2319fea264da19b4e7ec6860bf7a0
     last_used = models.DateTimeField(null=True, blank=True, help_text="Last time this coupon was used")
     
     is_active = models.BooleanField(default=True, help_text="Enable/disable this coupon")
