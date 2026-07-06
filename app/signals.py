@@ -1,10 +1,11 @@
+import os
+
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.core.mail import EmailMessage
 from django.conf import settings
 
 from .models import ScholarshipApplicant, SiteConfig
-from app.embed1 import update_pinecone_embeddings
 
 
 @receiver(post_save, sender=ScholarshipApplicant)
@@ -12,17 +13,35 @@ def handle_application_save(sender, instance, created, **kwargs):
     if instance.admin_verified and instance.report_file\
             and instance.email_verified and instance.paid:
 
-        subject = "Alegable Scholarships"
-        body = ""
+        language = 'en'
+        if isinstance(instance.form_data, dict):
+            language = instance.form_data.get('language', 'en')
+        language = language.lower() if isinstance(language, str) else 'en'
+        language = language if language in ('en', 'sv') else 'en'
+
+        site_config = getattr(settings, 'SITE_CONFIG', None) or SiteConfig.objects.first()
+        if site_config:
+            subject = site_config.get_report_email_subject(language)
+            body = site_config.get_report_email_body(language)
+        else:
+            if language == 'sv':
+                subject = "Din stipendierapport är klar"
+                body = "Hej,\n\nDin stipendierapport är bifogad. Granska den bifogade filen för matchade stipendier.\n\nRapportfil: {report_file_name}\n\nVänliga hälsningar,\nStipendieteamet\n"
+            else:
+                subject = "Your scholarship report is ready"
+                body = "Hello,\n\nYour scholarship report is attached. Please review the attached file for the matching scholarships.\n\nReport file: {report_file_name}\n\nBest regards,\nScholarship team\n"
+
+        pdf_path = instance.report_file.path
+        report_file_name = os.path.basename(pdf_path)
+        body = body.format(report_file_name=report_file_name, email=instance.email)
         email = EmailMessage(
             subject=subject,
             body=body,
             from_email=settings.EMAIL_HOST_USER,
             to=[instance.email],
         )
-        pdf_path = instance.report_file.path
         with open(pdf_path, "rb") as pdf:
-            email.attach("document.pdf", pdf.read(), "application/pdf")
+            email.attach(report_file_name, pdf.read(), "application/pdf")
 
         # Send the email
         print("SENDING FILE>>>")

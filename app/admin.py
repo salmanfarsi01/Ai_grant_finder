@@ -58,6 +58,20 @@ class SiteConfigAdmin(admin.ModelAdmin):
             'fields': ('use_default_dataset', 'active_dataset_index_name'),
             'description': 'Manage scholarship dataset indices. Check "Use Default Dataset Index" to use the hardcoded default index "scholarships-index-latest" from stipo54.py. Uncheck to use a custom dataset index.'
         }),
+        ('Email Templates - OTP', {
+            'fields': (
+                'otp_email_subject_en', 'otp_email_body_en',
+                'otp_email_subject_sv', 'otp_email_body_sv'
+            ),
+            'description': 'OTP email templates for English and Swedish. Use {otp} in the body text.',
+        }),
+        ('Email Templates - Final Report', {
+            'fields': (
+                'report_email_subject_en', 'report_email_body_en',
+                'report_email_subject_sv', 'report_email_body_sv'
+            ),
+            'description': 'Final report email templates for English and Swedish. Use {report_file_name} in the body text.',
+        }),
         ('Custom LLM Filter Prompt - Individual Users', {
             'fields': ('use_default_query_filter_individual', 'custom_query_prompt_individual',),
             'description': 'Override the default LLM filter prompt for individual users. Check "Use Default" to use hardcoded default, or uncheck to use custom prompt.',

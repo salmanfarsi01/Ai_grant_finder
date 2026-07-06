@@ -57,7 +57,7 @@ def update_pinecone_embeddings(file_path=None, index_name=None):
 
     # Use provided file path or default
     if not file_path:
-        file_path = "reports/new_scholarships_db.xlsx"
+        file_path = "reports/Stipo_latest_dataset.xlsx"
     
     df = pd.read_excel(file_path, engine="openpyxl")
     df = df.fillna("").astype(str)

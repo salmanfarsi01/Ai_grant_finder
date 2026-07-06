@@ -5,7 +5,7 @@ import random
 import uuid
 
 
-def create_otp(length: int = 4):
+def create_otp(length: int = 6):
     return ''.join(random.choices('0123456789', k=length))
 
 def generate_pdf_path(instance, file_name):
@@ -188,6 +188,48 @@ Example: ["Scholarship A", "Scholarship B", "Scholarship C"]""",
         help_text="JSON map of available dataset index names and their metadata."
     )
 
+    otp_email_subject_en = models.CharField(
+        max_length=255,
+        default="Your scholarship OTP code",
+        verbose_name="OTP Email Subject (EN)"
+    )
+    otp_email_body_en = models.TextField(
+        default="Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n",
+        verbose_name="OTP Email Body (EN)",
+        help_text="Use {otp} to insert the one-time passcode."
+    )
+    otp_email_subject_sv = models.CharField(
+        max_length=255,
+        default="Din OTP-kod för stipendiesökning",
+        verbose_name="OTP Email Subject (SV)"
+    )
+    otp_email_body_sv = models.TextField(
+        default="Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n",
+        verbose_name="OTP Email Body (SV)",
+        help_text="Use {otp} to insert the one-time passcode."
+    )
+
+    report_email_subject_en = models.CharField(
+        max_length=255,
+        default="Your scholarship report is ready",
+        verbose_name="Report Email Subject (EN)"
+    )
+    report_email_body_en = models.TextField(
+        default="Hello,\n\nYour scholarship report is attached. Please review the attached file for the matching scholarships.\n\nReport file: {report_file_name}\n\nBest regards,\nScholarship team\n",
+        verbose_name="Report Email Body (EN)",
+        help_text="Use {report_file_name} to insert the attached report file name."
+    )
+    report_email_subject_sv = models.CharField(
+        max_length=255,
+        default="Din stipendierapport är klar",
+        verbose_name="Report Email Subject (SV)"
+    )
+    report_email_body_sv = models.TextField(
+        default="Hej,\n\nDin stipendierapport är bifogad. Granska den bifogade filen för matchade stipendier.\n\nRapportfil: {report_file_name}\n\nVänliga hälsningar,\nStipendieteamet\n",
+        verbose_name="Report Email Body (SV)",
+        help_text="Use {report_file_name} to insert the attached report file name."
+    )
+
     def __str__(self):
         return "Site Settings"
 
@@ -251,6 +293,28 @@ Example: ["Scholarship A", "Scholarship B", "Scholarship C"]""",
             return None  # Signal to use hardcoded default
         return self.llm_reranker.strip() if self.llm_reranker else None
 
+    def _normalize_language(self, language):
+        if not isinstance(language, str):
+            return 'en'
+        language = language.strip().lower()
+        return language if language in ('en', 'sv') else 'en'
+
+    def get_otp_email_subject(self, language='en'):
+        language = self._normalize_language(language)
+        return getattr(self, f'otp_email_subject_{language}', self.otp_email_subject_en)
+
+    def get_otp_email_body(self, language='en'):
+        language = self._normalize_language(language)
+        return getattr(self, f'otp_email_body_{language}', self.otp_email_body_en)
+
+    def get_report_email_subject(self, language='en'):
+        language = self._normalize_language(language)
+        return getattr(self, f'report_email_subject_{language}', self.report_email_subject_en)
+
+    def get_report_email_body(self, language='en'):
+        language = self._normalize_language(language)
+        return getattr(self, f'report_email_body_{language}', self.report_email_body_en)
+
     def get_active_dataset_index_name(self):
         """
         Return the active dataset index name.
@@ -300,7 +364,7 @@ class Coupon(models.Model):
     
     # Usage tracking
     times_used = models.PositiveIntegerField(default=0, help_text="Number of times this coupon has been used")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When the coupon was created")
+    created_at = models.DateTimeField(auto_now_add=True, null=True, help_text="When the coupon was created")
     last_used = models.DateTimeField(null=True, blank=True, help_text="Last time this coupon was used")
     
     is_active = models.BooleanField(default=True, help_text="Enable/disable this coupon")

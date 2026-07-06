@@ -78,8 +78,18 @@ def _clean_raw(text):
     
     # Clean up excessive whitespace (multiple spaces/newlines)
     text = re.sub(r'\s+', ' ', text).strip()
-    
     return text
+
+
+def _normalize_language(value):
+    if not isinstance(value, str):
+        return 'en'
+    normalized = value.strip().lower()
+    return normalized if normalized in ('en', 'sv') else 'en'
+
+
+def _get_site_config():
+    return getattr(settings, 'SITE_CONFIG', None) or SiteConfig.objects.first()
 
 def normalize_form_data(form_data):
     """Normalize form_data on submission - maps municipality to proper case"""
@@ -448,10 +458,24 @@ def submit_application(request):
     application.admin_verified = bool(SITE_CONFIG and not SITE_CONFIG.admin_check)
     application.email_verified = False
     print("DEBUG ADMIN VER...: ", application.admin_verified)
+
+    language = _normalize_language(application.form_data.get('language'))
+    site_config = _get_site_config()
+    if site_config:
+        subject = site_config.get_otp_email_subject(language)
+        body = site_config.get_otp_email_body(language)
+    else:
+        if language == 'sv':
+            subject = "Din OTP-kod för stipendiesökning"
+            body = "Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n"
+        else:
+            subject = "Your scholarship OTP code"
+            body = "Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n"
+    body = body.format(otp=application.otp, email=application.email)
     send_mail(
-        subject="Application submitted",
-        message=f"plz use the otp: {application.otp}",
-        html_message="",
+        subject=subject,
+        message=body,
+        html_message=body,
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[application.email]
     )
@@ -472,18 +496,29 @@ def submit_application(request):
 
 @api_view(['post'])
 def send_verification_code(request, email):
-    # email = request.data.get('email')
     application = get_object_or_404(ScholarshipApplicant, email=email)
+    language = _normalize_language(application.form_data.get('language'))
+    site_config = _get_site_config()
+    if site_config:
+        subject = site_config.get_otp_email_subject(language)
+        body = site_config.get_otp_email_body(language)
+    else:
+        if language == 'sv':
+            subject = "Din OTP-kod för stipendiesökning"
+            body = "Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n"
+        else:
+            subject = "Your scholarship OTP code"
+            body = "Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n"
+    message = body.format(otp=application.otp, email=application.email)
     send_mail(
-        subject="Application submitted",
-        message=f"here is your otp: {application.otp}",
-        html_message=f"here is your otp: {application.otp}",
+        subject=subject,
+        message=message,
+        html_message=message,
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[email]
     )
     return Response({
-        "message": "a message with a verification code"
-                   " has been sent to your email."
+        "message": "A message with a verification code has been sent to your email."
     })
     pass
 

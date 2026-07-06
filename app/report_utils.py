@@ -87,11 +87,13 @@ def create_pdf(data, user_profile, watermark_path, output_path):
 
     # story.append(PageBreak())
     # Title
-
+    role = str(user_profile.get('role', '')).lower()
+    is_org = 'organ' in role
     if user_profile.get('language', '') == 'sv':
-        story.append(Paragraph("Rapport om studentbehörighet", styles["Title"]))
+        title = "Behörighetsrapport för organisation" if is_org else "Rapport om studentbehörighet"
     else:
-        story.append(Paragraph("Student Eligibility Report", styles["Title"]))
+        title = "Eligibility report for organization" if is_org else "Student Eligibility Report"
+    story.append(Paragraph(title, styles["Title"]))
     story.append(Spacer(1, 12))
 
     # User Profile Section
