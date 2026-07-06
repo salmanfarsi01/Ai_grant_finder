@@ -26,7 +26,7 @@ Make sure you have:
 cd "C:\Users\Salman Farsi\OneDrive\Desktop\python"
 
 # Enter the project folder 
-cd stepo_backend(foysal)
+cd stepo_backend
 
 # Create a virtual environment (if not already done)
 python -m venv venv
