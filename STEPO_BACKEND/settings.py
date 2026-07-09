@@ -36,31 +36,28 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.ngrok-free.app',
 ]
 # ---------------------------------------------------------------------------
-# Email — Postmark transactional API (no IMAP mailbox, no Sent-folder copy)
+# Email configuration (Postmark). For local development the code will
+# fall back to Django's console email backend if `POSTMARK_API_KEY` is
+# not provided to avoid runtime 500s when sending email.
 # ---------------------------------------------------------------------------
-# Postmark sends via HTTP API only.  There is no SMTP connection and no
-# mailbox involved, so the system never retains a second copy of the email.
-#
-# To use:
-#   1. Sign up at https://postmarkapp.com and create a Server.
-#   2. Copy the Server API Token into .env as POSTMARK_API_KEY.
-#   3. Set DEFAULT_FROM_EMAIL to a Sender Signature you have verified in
-#      Postmark (e.g. kontakt@stipendieportalen.se).
-#   4. In your Postmark dashboard → Servers → <your server> → Settings,
-#      make sure "Store sent emails" is OFF (it is off by default).
-# ---------------------------------------------------------------------------
-EMAIL_BACKEND = 'anymail.backends.postmark.EmailBackend'
+POSTMARK_TOKEN = os.environ.get('POSTMARK_API_KEY', '') or ''
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'kontakt@stipendieportalen.se')
 EMAIL_HOST_USER = DEFAULT_FROM_EMAIL  # kept so existing send_mail() calls still work
 
-ANYMAIL = {
-    'POSTMARK_SERVER_TOKEN': os.environ.get('POSTMARK_API_KEY', ''),
-    # Send via the standard outbound transactional stream.
-    # Change to a custom broadcast stream only if you need marketing emails.
-    'POSTMARK_MESSAGE_STREAM': 'outbound',
-    # Disable Anymail status tracking webhooks — not needed here.
-    'IGNORE_RECIPIENT_STATUS': True,
-}
+if POSTMARK_TOKEN.strip():
+    EMAIL_BACKEND = 'anymail.backends.postmark.EmailBackend'
+    ANYMAIL = {
+        'POSTMARK_SERVER_TOKEN': POSTMARK_TOKEN.strip(),
+        # Send via the standard outbound transactional stream.
+        'POSTMARK_MESSAGE_STREAM': 'outbound',
+        # Disable Anymail status tracking webhooks — not needed here.
+        'IGNORE_RECIPIENT_STATUS': True,
+    }
+else:
+    # Development fallback: print emails to console instead of sending.
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    ANYMAIL = {}
+    print("WARNING: POSTMARK_API_KEY not set — using console email backend.")
 
 # Application definition
 
@@ -80,8 +77,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -89,8 +86,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'STEPO_BACKEND.urls'
-
+# When frontend sends cookies/credentials, allow credentialed CORS responses
+CORS_ALLOW_CREDENTIALS = True
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -105,6 +102,8 @@ TEMPLATES = [
         },
     },
 ]
+
+ROOT_URLCONF = 'STEPO_BACKEND.urls'
 
 WSGI_APPLICATION = 'STEPO_BACKEND.wsgi.application'
 
@@ -122,6 +121,14 @@ DATABASES = {
         'PORT': os.environ.get('DB_PORT', ''),
     }
 }
+
+# Development fallback: use SQLite when no DB_NAME is provided.
+# This makes it easier to run the app locally without configuring Postgres.
+if not DATABASES['default'].get('NAME'):
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 
 
 # Password validation

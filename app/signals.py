@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import os
-=======
 import os as _os
->>>>>>> 7a07bb29e8c2319fea264da19b4e7ec6860bf7a0
 
 from django.dispatch import receiver
 from django.db.models.signals import post_save
@@ -26,13 +22,14 @@ def handle_application_save(sender, instance, created, **kwargs):
     if instance.admin_verified and instance.report_file \
             and instance.email_verified and instance.paid:
 
-<<<<<<< HEAD
+        # Determine language from form_data (default to English)
         language = 'en'
         if isinstance(instance.form_data, dict):
             language = instance.form_data.get('language', 'en')
         language = language.lower() if isinstance(language, str) else 'en'
         language = language if language in ('en', 'sv') else 'en'
 
+        # Use SiteConfig if available for subject/body overrides
         site_config = getattr(settings, 'SITE_CONFIG', None) or SiteConfig.objects.first()
         if site_config:
             subject = site_config.get_report_email_subject(language)
@@ -46,28 +43,18 @@ def handle_application_save(sender, instance, created, **kwargs):
                 body = "Hello,\n\nYour scholarship report is attached. Please review the attached file for the matching scholarships.\n\nReport file: {report_file_name}\n\nBest regards,\nScholarship team\n"
 
         pdf_path = instance.report_file.path
-        report_file_name = os.path.basename(pdf_path)
+        report_file_name = _os.path.basename(pdf_path)
         body = body.format(report_file_name=report_file_name, email=instance.email)
-        email = EmailMessage(
-=======
-        pdf_path = instance.report_file.path
 
-        # --- 1. Build and send the email ---
-        subject = "Alegable Scholarships"
-        body = ""
+        # Build and send the email
         email_msg = EmailMessage(
->>>>>>> 7a07bb29e8c2319fea264da19b4e7ec6860bf7a0
             subject=subject,
             body=body,
             from_email=settings.EMAIL_HOST_USER,
             to=[instance.email],
         )
         with open(pdf_path, "rb") as pdf:
-<<<<<<< HEAD
-            email.attach(report_file_name, pdf.read(), "application/pdf")
-=======
-            email_msg.attach("document.pdf", pdf.read(), "application/pdf")
->>>>>>> 7a07bb29e8c2319fea264da19b4e7ec6860bf7a0
+            email_msg.attach(report_file_name, pdf.read(), "application/pdf")
 
         print("SENDING FILE>>>")
         email_msg.send()

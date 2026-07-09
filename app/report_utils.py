@@ -19,7 +19,7 @@ PROFILE_KEY_VALUE_MAP = {
     "age": "Ålder",
     "study_level": "Studienivå",
     "municipality": "Kommun",
-    "purpose_of_funding": "Syfte_med_finansiering",
+    "purpose_of_funding": "Syfte med finansiering",
     "language": "Språk",
     "subject": "Ämne"
 }
@@ -76,6 +76,14 @@ SCHOLARSHIP_KEY_VALUE_MAP_SV = {
     "Postnr": "Postnummer",
     "Stad": "Stad",
     "Län": "Län",
+}
+
+# Fields to exclude from scholarship table in the PDF (both languages)
+EXCLUDED_SCHOLARSHIP_FIELDS = {
+    'Category', 'Kategori',
+    'ID', 'id',
+    'Subject', 'Ämne',
+    'Study Level', 'Utbildningsnivå', 'Utbildningsnivå'
 }
 
 
@@ -153,6 +161,9 @@ def create_pdf(data, user_profile, watermark_path, output_path):
         if 'Namn' in scholarship.keys():
             scholarship.pop('Namn')
         for key, value in scholarship.items():
+            # Skip excluded scholarship fields (not relevant to foundation info)
+            if key in EXCLUDED_SCHOLARSHIP_FIELDS:
+                continue
             if key in ['Base Score', 'Relevance Score', 'Entity Bonus', 'Adjusted Score']:
                 continue
             if value and str(value) != "NaN":

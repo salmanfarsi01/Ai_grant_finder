@@ -458,41 +458,46 @@ def submit_application(request):
     application.admin_verified = bool(SITE_CONFIG and not SITE_CONFIG.admin_check)
     application.email_verified = False
     print("DEBUG ADMIN VER...: ", application.admin_verified)
-<<<<<<< HEAD
 
     language = _normalize_language(application.form_data.get('language'))
     site_config = _get_site_config()
     if site_config:
         subject = site_config.get_otp_email_subject(language)
         body = site_config.get_otp_email_body(language)
+        body = body.format(otp=application.otp, email=application.email)
+        html_message = body
     else:
         if language == 'sv':
             subject = "Din OTP-kod för stipendiesökning"
-            body = "Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n"
+            body = "Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n".format(otp=application.otp)
+            html_message = f"""
+            <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+                <h2>Din OTP-kod</h2>
+                <p>Din engångskod är:</p>
+                <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
+                    {application.otp}
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">Dela inte denna kod med någon annan.</p>
+            </div>
+            """
         else:
             subject = "Your scholarship OTP code"
-            body = "Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n"
-    body = body.format(otp=application.otp, email=application.email)
+            body = "Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n".format(otp=application.otp)
+            html_message = f"""
+            <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+                <h2>Email Verification Code</h2>
+                <p>Your one-time password (OTP) is:</p>
+                <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
+                    {application.otp}
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">This code is required to submit your application. Please do not share it with anyone.</p>
+            </div>
+            """
+
     send_mail(
         subject=subject,
         message=body,
-        html_message=body,
-=======
-    otp_html = f"""
-    <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-        <h2>Email Verification Code</h2>
-        <p>Your one-time password (OTP) is:</p>
-        <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
-            {application.otp}
-        </div>
-        <p style="color: #666; font-size: 14px; margin-top: 20px;">This code is required to submit your application. Please do not share it with anyone.</p>
-    </div>
-    """
-    send_mail(
-        subject="Your Application Verification Code",
-        message=f"Please use the following OTP to verify your application: {application.otp}",
-        html_message=otp_html,
->>>>>>> 7a07bb29e8c2319fea264da19b4e7ec6860bf7a0
+        html_message=html_message,
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[application.email]
     )
@@ -514,40 +519,45 @@ def submit_application(request):
 @api_view(['post'])
 def send_verification_code(request, email):
     application = get_object_or_404(ScholarshipApplicant, email=email)
-<<<<<<< HEAD
     language = _normalize_language(application.form_data.get('language'))
     site_config = _get_site_config()
     if site_config:
         subject = site_config.get_otp_email_subject(language)
         body = site_config.get_otp_email_body(language)
+        body = body.format(otp=application.otp, email=application.email)
+        html_message = body
     else:
         if language == 'sv':
             subject = "Din OTP-kod för stipendiesökning"
-            body = "Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n"
+            body = "Hej,\n\nAnvänd denna OTP-kod för att fortsätta din stipendiesökning:\n\n{otp}\n\nTack.\n".format(otp=application.otp)
+            html_message = f"""
+            <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+                <h2>Din OTP-kod</h2>
+                <p>Din engångskod är:</p>
+                <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
+                    {application.otp}
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">Dela inte denna kod med någon annan.</p>
+            </div>
+            """
         else:
             subject = "Your scholarship OTP code"
-            body = "Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n"
-    message = body.format(otp=application.otp, email=application.email)
+            body = "Hello,\n\nUse this OTP code to continue your scholarship search:\n\n{otp}\n\nThank you.\n".format(otp=application.otp)
+            html_message = f"""
+            <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+                <h2>Email Verification Code</h2>
+                <p>Your one-time password (OTP) is:</p>
+                <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
+                    {application.otp}
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">This code is required to submit your application. Please do not share it with anyone.</p>
+            </div>
+            """
+
     send_mail(
         subject=subject,
-        message=message,
-        html_message=message,
-=======
-    otp_html = f"""
-    <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-        <h2>Email Verification Code</h2>
-        <p>Your one-time password (OTP) is:</p>
-        <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a73e8; background-color: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #e8eaed; margin: 20px 0;">
-            {application.otp}
-        </div>
-        <p style="color: #666; font-size: 14px; margin-top: 20px;">This code is required to submit your application. Please do not share it with anyone.</p>
-    </div>
-    """
-    send_mail(
-        subject="Your Application Verification Code",
-        message=f"Please use the following OTP to verify your application: {application.otp}",
-        html_message=otp_html,
->>>>>>> 7a07bb29e8c2319fea264da19b4e7ec6860bf7a0
+        message=body,
+        html_message=html_message,
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[email]
     )
