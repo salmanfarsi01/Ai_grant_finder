@@ -6,7 +6,7 @@ from django.db import models
 # admin.py
 from django.contrib import admin
 from .models import (
-    SiteConfig, FAQ, ScholarshipApplicant,
+    SiteConfig, DatasetUpload, FAQ, ScholarshipApplicant,
     Review, Coupon, PreDefinedScholarship
 )
 
@@ -30,33 +30,10 @@ class SiteConfigAdmin(admin.ModelAdmin):
         return redirect(reverse(f'admin:{app_label}_{model_name}_add'))
         return super().changelist_view(request, extra_context)
 
-    def get_readonly_fields(self, request, v):
-        return ["pinecone_updated"]
-    
-    def upload_to_pinecone(self, request, queryset):
-        """Manual action to upload Excel file to Pinecone"""
-        from threading import Thread
-        from app.embed1 import update_pinecone_embeddings
-        
-        for obj in queryset:
-            if obj.scholarships_db_file:
-                print(f"✓ Manual upload triggered for index: {obj.active_dataset_index_name}")
-                Thread(target=update_pinecone_embeddings).start()
-                self.message_user(request, f"✓ Upload started to index: {obj.active_dataset_index_name}")
-            else:
-                self.message_user(request, "❌ No Excel file selected. Please upload a file first.")
-    
-    upload_to_pinecone.short_description = "📤 Manual Upload: Upload Excel data to Pinecone"
-    actions = ['upload_to_pinecone']
-
     fieldsets = (
         ('System Settings', {
-            'fields': ('admin_check', 'scholarships_db_file', 'pinecone_updated'),
+            'fields': ('admin_check',),
             'description': 'Basic system configuration'
-        }),
-        ('Dataset Management', {
-            'fields': ('use_default_dataset', 'active_dataset_index_name'),
-            'description': 'Manage scholarship dataset indices. Check "Use Default Dataset Index" to use the hardcoded default index "scholarships-index-latest" from stipo54.py. Uncheck to use a custom dataset index.'
         }),
         ('Email Templates - OTP', {
             'fields': (
@@ -91,6 +68,46 @@ class SiteConfigAdmin(admin.ModelAdmin):
             'fields': ('use_default_reranker_organization', 'custom_reranker_prompt_organization',),
             'description': 'Override the default LLM reranker prompt for organization users. Check "Use Default" to use hardcoded default, or uncheck to use custom prompt.',
             'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(DatasetUpload)
+class DatasetUploadAdmin(admin.ModelAdmin):
+    list_display = (
+        'index_name', 'active', 'pinecone_updated', 'upload_status', 'upload_progress_percent', 'upload_rows_uploaded', 'upload_rows_total', 'last_uploaded_at'
+    )
+
+    def has_add_permission(self, request):
+        return True
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj is None:
+            return []
+        return ['pinecone_updated', 'last_uploaded_at', 'created_at', 'updated_at', 'upload_status', 'upload_progress_percent', 'upload_rows_uploaded', 'upload_rows_total', 'upload_error_message']
+
+    def upload_to_pinecone(self, request, queryset):
+        from threading import Thread
+        from app.embed1 import update_pinecone_embeddings
+
+        for obj in queryset:
+            if obj.scholarships_db_file:
+                print(f"✓ Manual upload triggered for index: {obj.get_effective_index_name()}")
+                Thread(target=update_pinecone_embeddings, args=(obj.scholarships_db_file.path, obj.get_effective_index_name())).start()
+                self.message_user(request, f"✓ Upload started to index: {obj.get_effective_index_name()}")
+            else:
+                self.message_user(request, "❌ No Excel file selected. Please upload a file first.")
+
+    upload_to_pinecone.short_description = "📤 Manual Upload: Upload Excel data to Pinecone"
+    actions = ['upload_to_pinecone']
+
+    fieldsets = (
+        ('Dataset Upload', {
+            'fields': (
+                'scholarships_db_file', 'use_default_dataset', 'index_name', 'active',
+                'pinecone_updated', 'upload_status', 'upload_progress_percent', 'upload_rows_uploaded', 'upload_rows_total', 'upload_error_message', 'last_uploaded_at'
+            ),
+            'description': 'Upload a dataset file and choose the index name used for Pinecone. Mark one dataset as active for queries. Upload status and progress are shown while a background upload runs.'
         }),
     )
 

@@ -41,11 +41,6 @@ class SiteConfig(models.Model):
     # )
 
     admin_check = models.BooleanField(default=True)
-    scholarships_db_file = models.FileField(upload_to=scholarship_db_path, null=True)
-    pinecone_updated = models.BooleanField(default=False)
-    upload_in_progress = models.BooleanField(default=False, help_text="Tracks if an upload is currently running to prevent duplicate uploads")
-    last_active_dataset_index = models.CharField(max_length=255, default="scholarships-index-latest", help_text="Previous active index to detect when user changes it")
-
     query_template = models.TextField(
         verbose_name="LLM filter system prompt",
         default="""You are a scholarship inclusion filter. Your only job is to remove scholarships the user cannot realistically apply for. Default action is INCLUDE. Only exclude when the mismatch is clear and unambiguous.
@@ -168,27 +163,6 @@ Example: ["Scholarship A", "Scholarship B", "Scholarship C"]""",
 
     # Legacy use_default - kept for backward compatibility
     use_default = models.BooleanField(default=True)
-
-    # Dataset management fields
-    use_default_dataset = models.BooleanField(
-        default=True,
-        verbose_name="Use Default Dataset Index",
-        help_text="Check to use the hardcoded default index 'scholarships-index-latest' from stipo54.py. Uncheck to use a custom dataset index."
-    )
-
-    active_dataset_index_name = models.CharField(
-        max_length=255,
-        default="scholarships-index-latest",
-        verbose_name="Active Dataset Index Name",
-        help_text="The name of the Pinecone index to use when 'Use Default Dataset Index' is unchecked."
-    )
-
-    available_dataset_indices = models.JSONField(
-        default=dict,
-        blank=True,
-        verbose_name="Available Dataset Indices",
-        help_text="JSON map of available dataset index names and their metadata."
-    )
 
     otp_email_subject_en = models.CharField(
         max_length=255,
@@ -320,20 +294,128 @@ Example: ["Scholarship A", "Scholarship B", "Scholarship C"]""",
     def get_active_dataset_index_name(self):
         """
         Return the active dataset index name.
-        - If use_default_dataset is True → return "scholarships-index-latest" (hardcoded default)
-        - If use_default_dataset is False → return the configured active_dataset_index_name
-        
-        NOTE: Automatically converts underscores to hyphens for Pinecone compatibility
-        (Pinecone only allows: lowercase alphanumeric and hyphens)
+        This delegates to DatasetUpload if one is configured.
         """
+        try:
+            dataset = DatasetUpload.get_active()
+            if dataset:
+                return dataset.get_effective_index_name()
+        except Exception:
+            pass
+        return "scholarships-index-latest"
+
+
+class DatasetUpload(models.Model):
+    scholarships_db_file = models.FileField(upload_to=scholarship_db_path, null=True, blank=True)
+    index_name = models.CharField(
+        max_length=255,
+        default="scholarships-index-latest",
+        verbose_name="Dataset Index Name"
+    )
+    use_default_dataset = models.BooleanField(
+        default=True,
+        verbose_name="Use Default Dataset Index",
+        help_text="Check to use the hardcoded default index 'scholarships-index-latest'."
+    )
+    active = models.BooleanField(
+        default=True,
+        verbose_name="Active Dataset",
+        help_text="Mark this dataset upload as the active index used for queries."
+    )
+    pinecone_updated = models.BooleanField(
+        default=False,
+        verbose_name="Pinecone updated",
+        help_text="Set to true when this dataset has been successfully uploaded to Pinecone."
+    )
+    last_uploaded_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Last uploaded at",
+        help_text="Timestamp when this dataset was successfully uploaded to Pinecone."
+    )
+    # Upload status tracking (for admin UX and restart-safety)
+    UPLOAD_STATUS_PENDING = 'pending'
+    UPLOAD_STATUS_IN_PROGRESS = 'in_progress'
+    UPLOAD_STATUS_INDEX_CREATED = 'index_created'
+    UPLOAD_STATUS_PARTIAL = 'partial'
+    UPLOAD_STATUS_COMPLETED = 'completed'
+    UPLOAD_STATUS_FAILED = 'failed'
+
+    UPLOAD_STATUS_CHOICES = (
+        (UPLOAD_STATUS_PENDING, 'Pending'),
+        (UPLOAD_STATUS_IN_PROGRESS, 'In Progress'),
+        (UPLOAD_STATUS_INDEX_CREATED, 'Index Created'),
+        (UPLOAD_STATUS_PARTIAL, 'Partial Upload'),
+        (UPLOAD_STATUS_COMPLETED, 'Completed'),
+        (UPLOAD_STATUS_FAILED, 'Failed'),
+    )
+
+    upload_status = models.CharField(
+        max_length=32,
+        choices=UPLOAD_STATUS_CHOICES,
+        default=UPLOAD_STATUS_PENDING,
+        verbose_name='Upload Status',
+        help_text='High-level status of the dataset upload to Pinecone.'
+    )
+
+    upload_progress_percent = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Upload Progress (%)',
+        help_text='Integer percent progress (0-100) updated during background uploads.'
+    )
+
+    upload_rows_uploaded = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Rows uploaded',
+        help_text='Number of rows successfully uploaded to the index.'
+    )
+
+    upload_rows_total = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Total rows',
+        help_text='Total number of rows in the dataset when upload started.'
+    )
+
+    upload_error_message = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='Upload error message',
+        help_text='If the upload fails, a short error message is recorded here.'
+    )
+    upload_in_progress = models.BooleanField(
+        default=False,
+        verbose_name="Upload in progress",
+        help_text="Internal use only: true while a background upload is running."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Dataset Upload"
+        verbose_name_plural = "Dataset Uploads"
+        ordering = ["-updated_at", "-created_at"]
+
+    def __str__(self):
+        return self.index_name or "Dataset Upload"
+
+    def get_effective_index_name(self):
         if self.use_default_dataset:
-            return "scholarships-index-latest"  # Signal to use hardcoded default from stipo54.py
-        
-        index_name = self.active_dataset_index_name.strip() if self.active_dataset_index_name else "scholarships-index-latest"
-        # Convert underscores to hyphens for Pinecone compatibility
-        # Pinecone requires: lowercase alphanumeric characters or '-' only
-        index_name = index_name.replace('_', '-').lower()
-        return index_name
+            return "scholarships-index-latest"
+        index_name = self.index_name.strip() if self.index_name else "scholarships-index-latest"
+        return index_name.replace("_", "-").lower()
+
+    @classmethod
+    def get_active(cls):
+        active_record = cls.objects.filter(active=True).order_by("-updated_at", "-created_at").first()
+        if active_record:
+            return active_record
+        return cls.objects.order_by("-updated_at", "-created_at").first()
+
+    def save(self, *args, **kwargs):
+        if self.active:
+            DatasetUpload.objects.exclude(pk=self.pk).update(active=False)
+        super().save(*args, **kwargs)
 
 
 class FAQ(models.Model):

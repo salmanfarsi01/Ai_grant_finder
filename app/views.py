@@ -4,6 +4,7 @@ import app
 load_dotenv()
 import jwt
 import json
+import logging
 import os
 
 import uuid
@@ -33,6 +34,8 @@ from . import report_utils
 from .models import ScholarshipApplicant, Review, FAQ, Coupon, PreDefinedScholarship, SiteConfig
 from deep_translator import GoogleTranslator
 import re
+
+logger = logging.getLogger(__name__)
 
 # Unicode cleaning regex and replacement map for PDF rendering
 _BOX_CLEAN = re.compile(
@@ -86,6 +89,26 @@ def _normalize_language(value):
         return 'en'
     normalized = value.strip().lower()
     return normalized if normalized in ('en', 'sv') else 'en'
+
+
+def _send_verification_email(email, subject, body, html_message, otp):
+    """Send OTP email and gracefully log a fallback message for local testing."""
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            html_message=html_message,
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=[email],
+        )
+        return True
+    except Exception as exc:
+        if settings.DEBUG:
+            logger.warning("OTP email delivery skipped for %s. OTP: %s. Error: %s", email, otp, exc)
+            print(f"OTP email delivery skipped for {email}. OTP: {otp}")
+        else:
+            logger.exception("Failed to send verification email to %s", email)
+        return False
 
 
 def _get_site_config():
@@ -494,12 +517,12 @@ def submit_application(request):
             </div>
             """
 
-    send_mail(
+    _send_verification_email(
+        email=application.email,
         subject=subject,
-        message=body,
+        body=body,
         html_message=html_message,
-        from_email=settings.EMAIL_HOST_USER,
-        recipient_list=[application.email]
+        otp=application.otp,
     )
     #     Thread(
     #     target=send_mail,
@@ -554,12 +577,12 @@ def send_verification_code(request, email):
             </div>
             """
 
-    send_mail(
+    _send_verification_email(
+        email=email,
         subject=subject,
-        message=body,
+        body=body,
         html_message=html_message,
-        from_email=settings.EMAIL_HOST_USER,
-        recipient_list=[email]
+        otp=application.otp,
     )
     return Response({
         "message": "A message with a verification code has been sent to your email."

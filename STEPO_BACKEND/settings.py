@@ -37,27 +37,47 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 # ---------------------------------------------------------------------------
 # Email configuration (Postmark). For local development the code will
-# fall back to Django's console email backend if `POSTMARK_API_KEY` is
-# not provided to avoid runtime 500s when sending email.
+# fall back to Django's console email backend so OTP testing works without
+# requiring a verified Postmark sender signature or outbound approval.
 # ---------------------------------------------------------------------------
-POSTMARK_TOKEN = os.environ.get('POSTMARK_API_KEY', '') or ''
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'kontakt@stipendieportalen.se')
-EMAIL_HOST_USER = DEFAULT_FROM_EMAIL  # kept so existing send_mail() calls still work
+def _get_email_backend_config(debug=False):
+    postmark_token = (
+        os.environ.get('POSTMARK_API_KEY')
+        or os.environ.get('POSTMARK_SERVER_TOKEN')
+        or os.environ.get('POSTMARK_TOKEN', '')
+        or ''
+    ).strip()
 
-if POSTMARK_TOKEN.strip():
-    EMAIL_BACKEND = 'anymail.backends.postmark.EmailBackend'
-    ANYMAIL = {
-        'POSTMARK_SERVER_TOKEN': POSTMARK_TOKEN.strip(),
-        # Send via the standard outbound transactional stream.
-        'POSTMARK_MESSAGE_STREAM': 'outbound',
-        # Disable Anymail status tracking webhooks — not needed here.
-        'IGNORE_RECIPIENT_STATUS': True,
-    }
-else:
-    # Development fallback: print emails to console instead of sending.
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    ANYMAIL = {}
-    print("WARNING: POSTMARK_API_KEY not set — using console email backend.")
+    use_console_email = (
+        os.environ.get('USE_CONSOLE_EMAIL', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        or bool(debug)
+    )
+
+    if postmark_token and not use_console_email:
+        return (
+            'anymail.backends.postmark.EmailBackend',
+            {
+                'POSTMARK_SERVER_TOKEN': postmark_token,
+                'POSTMARK_MESSAGE_STREAM': 'outbound',
+                'IGNORE_RECIPIENT_STATUS': True,
+            },
+        )
+
+    return 'django.core.mail.backends.console.EmailBackend', {}
+
+
+POSTMARK_TOKEN = (
+    os.environ.get('POSTMARK_API_KEY')
+    or os.environ.get('POSTMARK_SERVER_TOKEN')
+    or os.environ.get('POSTMARK_TOKEN', '')
+    or ''
+).strip()
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'salmanf4545@gmail.com')
+EMAIL_HOST_USER = DEFAULT_FROM_EMAIL  # kept so existing send_mail() calls still work
+EMAIL_BACKEND, ANYMAIL = _get_email_backend_config(DEBUG)
+
+if EMAIL_BACKEND.endswith('console.EmailBackend'):
+    print("WARNING: using console email backend for local development.")
 
 # Application definition
 
