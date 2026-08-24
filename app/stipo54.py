@@ -14,36 +14,36 @@ from stipo54 import (
     MIN_RESULTS
 )
 
-# Try to import Django SiteConfig for custom prompts, 
+# Try to import Django prompt configuration for custom prompts,
 # but don't fail if Django is not initialized yet
 try:
     from django.conf import settings
     if settings.configured:
-        from .models import SiteConfig
+        from .models import LLMPromptConfig
     else:
-        SiteConfig = None
+        LLMPromptConfig = None
 except (ImportError, RuntimeError):
-    SiteConfig = None
+    LLMPromptConfig = None
 
 
 def get_filter_prompt(user_type="individual"):
     """
-    Fetch custom LLM filter prompt from SiteConfig.
+    Fetch custom LLM filter prompt from LLMPromptConfig.
     Returns None if use_default is True (signals to use hardcoded default).
     Returns custom prompt if use_default is False and custom prompt is set.
     """
-    if not SiteConfig:
+    if not LLMPromptConfig:
         return None
     
     try:
-        site_config = SiteConfig.objects.first()
-        if not site_config:
+        prompt_config = LLMPromptConfig.objects.first()
+        if not prompt_config:
             return None
         
         if user_type.lower() == "organization":
-            return site_config.get_filter_prompt_organization()
+            return prompt_config.get_filter_prompt_organization()
         else:
-            return site_config.get_filter_prompt_individual()
+            return prompt_config.get_filter_prompt_individual()
     except Exception:
         pass
     
@@ -52,22 +52,22 @@ def get_filter_prompt(user_type="individual"):
 
 def get_reranker_prompt(user_type="individual"):
     """
-    Fetch custom LLM reranker prompt from SiteConfig.
+    Fetch custom LLM reranker prompt from LLMPromptConfig.
     Returns None if use_default is True (signals to use hardcoded default).
     Returns custom prompt if use_default is False and custom prompt is set.
     """
-    if not SiteConfig:
+    if not LLMPromptConfig:
         return None
     
     try:
-        site_config = SiteConfig.objects.first()
-        if not site_config:
+        prompt_config = LLMPromptConfig.objects.first()
+        if not prompt_config:
             return None
         
         if user_type.lower() == "organization":
-            return site_config.get_reranker_prompt_organization()
+            return prompt_config.get_reranker_prompt_organization()
         else:
-            return site_config.get_reranker_prompt_individual()
+            return prompt_config.get_reranker_prompt_individual()
     except Exception:
         pass
     
@@ -124,13 +124,13 @@ def find_scholarships_v2(
         top_k: Number of initial candidates to retrieve
         debug: Enable debug output
         use_llm_rerank: Use LLM reranking
-        custom_system_prompt: Custom LLM filter prompt (overrides SiteConfig)
-        custom_rerank_prompt: Custom LLM reranker prompt (overrides SiteConfig)
+        custom_system_prompt: Custom LLM filter prompt (overrides configuration)
+        custom_rerank_prompt: Custom LLM reranker prompt (overrides configuration)
         
     Returns:
         List of scholarship dictionaries (formatted ready for PDF generation)
     """
-    # Fetch custom prompts from SiteConfig if not provided as parameters
+    # Fetch custom prompts from the dedicated configuration if not provided.
     if custom_system_prompt is None:
         custom_system_prompt = get_filter_prompt(user_type)
     

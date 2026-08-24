@@ -31,7 +31,7 @@ from . import ai_utils
 from . import stipo54
 # from . import stepo_47rag
 from . import report_utils
-from .models import ScholarshipApplicant, Review, FAQ, Coupon, PreDefinedScholarship, SiteConfig
+from .models import ScholarshipApplicant, Review, FAQ, Coupon, PreDefinedScholarship, SiteConfig, EmailTemplateConfig, LLMPromptConfig
 from deep_translator import GoogleTranslator
 import re
 
@@ -483,10 +483,10 @@ def submit_application(request):
     print("DEBUG ADMIN VER...: ", application.admin_verified)
 
     language = _normalize_language(application.form_data.get('language'))
-    site_config = _get_site_config()
-    if site_config:
-        subject = site_config.get_otp_email_subject(language)
-        body = site_config.get_otp_email_body(language)
+    email_config = EmailTemplateConfig.objects.first()
+    if email_config:
+        subject = email_config.get_otp_email_subject(language)
+        body = email_config.get_otp_email_body(language)
         body = body.format(otp=application.otp, email=application.email)
         html_message = body
     else:
@@ -543,10 +543,10 @@ def submit_application(request):
 def send_verification_code(request, email):
     application = get_object_or_404(ScholarshipApplicant, email=email)
     language = _normalize_language(application.form_data.get('language'))
-    site_config = _get_site_config()
-    if site_config:
-        subject = site_config.get_otp_email_subject(language)
-        body = site_config.get_otp_email_body(language)
+    email_config = EmailTemplateConfig.objects.first()
+    if email_config:
+        subject = email_config.get_otp_email_subject(language)
+        body = email_config.get_otp_email_body(language)
         body = body.format(otp=application.otp, email=application.email)
         html_message = body
     else:
@@ -676,18 +676,18 @@ def generate_data(request):
     print("DEBUGING ROLE *******************  ", application.form_data['elite_athlete'])
     
     # Get SiteConfig to retrieve custom prompts if they exist
-    site_config = SiteConfig.objects.first()
+    prompt_config = LLMPromptConfig.objects.first()
     user_type = application.form_data['role']
     custom_system_prompt = None
     custom_rerank_prompt = None
     
-    if site_config:
+    if prompt_config:
         if user_type.lower() == 'individual' or user_type.lower() == 'privatperson':
-            custom_system_prompt = site_config.get_filter_prompt_individual()
-            custom_rerank_prompt = site_config.get_reranker_prompt_individual()
+            custom_system_prompt = prompt_config.get_filter_prompt_individual()
+            custom_rerank_prompt = prompt_config.get_reranker_prompt_individual()
         elif user_type.lower() == 'organisation' or user_type.lower() == 'organization':
-            custom_system_prompt = site_config.get_filter_prompt_organization()
-            custom_rerank_prompt = site_config.get_reranker_prompt_organization()
+            custom_system_prompt = prompt_config.get_filter_prompt_organization()
+            custom_rerank_prompt = prompt_config.get_reranker_prompt_organization()
     
     report_data = stipo54.find_scholarships_v2(
         user_purpose=application.form_data['purpose_of_funding'],

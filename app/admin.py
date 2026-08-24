@@ -7,7 +7,7 @@ from django.db import models
 from django.contrib import admin
 from .models import (
     SiteConfig, DatasetUpload, FAQ, ScholarshipApplicant,
-    Review, Coupon, PreDefinedScholarship
+    Review, Coupon, PreDefinedScholarship, LLMPromptConfig, EmailTemplateConfig
 )
 
 
@@ -35,41 +35,42 @@ class SiteConfigAdmin(admin.ModelAdmin):
             'fields': ('admin_check',),
             'description': 'Basic system configuration'
         }),
-        ('Email Templates - OTP', {
-            'fields': (
-                'otp_email_subject_en', 'otp_email_body_en',
-                'otp_email_subject_sv', 'otp_email_body_sv'
-            ),
-            'description': 'OTP email templates for English and Swedish. Use {otp} in the body text.',
-        }),
-        ('Email Templates - Final Report', {
-            'fields': (
-                'report_email_subject_en', 'report_email_body_en',
-                'report_email_subject_sv', 'report_email_body_sv'
-            ),
-            'description': 'Final report email templates for English and Swedish. Use {report_file_name} in the body text.',
-        }),
-        ('Custom LLM Filter Prompt - Individual Users', {
-            'fields': ('use_default_query_filter_individual', 'custom_query_prompt_individual',),
-            'description': 'Override the default LLM filter prompt for individual users. Check "Use Default" to use hardcoded default, or uncheck to use custom prompt.',
-            'classes': ('collapse',)
-        }),
-        ('Custom LLM Filter Prompt - Organization Users', {
-            'fields': ('use_default_query_filter_organization', 'custom_query_prompt_organization',),
-            'description': 'Override the default LLM filter prompt for organization users - förening, klubb, juridisk person. Check "Use Default" to use hardcoded default, or uncheck to use custom prompt.',
-            'classes': ('collapse',)
-        }),
-        ('Custom LLM Reranker Prompt - Individual Users', {
-            'fields': ('use_default_reranker_individual', 'custom_reranker_prompt_individual',),
-            'description': 'Override the default LLM reranker prompt for individual users. Check "Use Default" to use hardcoded default, or uncheck to use custom prompt.',
-            'classes': ('collapse',)
-        }),
-        ('Custom LLM Reranker Prompt - Organization Users', {
-            'fields': ('use_default_reranker_organization', 'custom_reranker_prompt_organization',),
-            'description': 'Override the default LLM reranker prompt for organization users. Check "Use Default" to use hardcoded default, or uncheck to use custom prompt.',
-            'classes': ('collapse',)
-        }),
     )
+
+
+@admin.register(LLMPromptConfig)
+class LLMPromptConfigAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ('Base Prompts', {'fields': ('use_default_query_filter_base', 'query_template', 'use_default_reranker_base', 'llm_reranker')}),
+        ('Individual User Prompts', {'fields': ('use_default_query_filter_individual', 'custom_query_prompt_individual', 'use_default_reranker_individual', 'custom_reranker_prompt_individual')}),
+        ('Organization User Prompts', {'fields': ('use_default_query_filter_organization', 'custom_query_prompt_organization', 'use_default_reranker_organization', 'custom_reranker_prompt_organization')}),
+    )
+
+    def has_add_permission(self, request):
+        return not LLMPromptConfig.objects.exists()
+
+    def changelist_view(self, request, extra_context=None):
+        obj = LLMPromptConfig.objects.first()
+        if obj:
+            return redirect(reverse('admin:app_llmpromptconfig_change', args=[obj.pk]))
+        return redirect(reverse('admin:app_llmpromptconfig_add'))
+
+
+@admin.register(EmailTemplateConfig)
+class EmailTemplateConfigAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ('OTP Verification Email', {'fields': ('otp_email_subject_en', 'otp_email_body_en', 'otp_email_subject_sv', 'otp_email_body_sv'), 'description': 'Use {otp} and {email} as placeholders.'}),
+        ('Final Report Email', {'fields': ('report_email_subject_en', 'report_email_body_en', 'report_email_subject_sv', 'report_email_body_sv'), 'description': 'Use {report_file_name} and {email} as placeholders.'}),
+    )
+
+    def has_add_permission(self, request):
+        return not EmailTemplateConfig.objects.exists()
+
+    def changelist_view(self, request, extra_context=None):
+        obj = EmailTemplateConfig.objects.first()
+        if obj:
+            return redirect(reverse('admin:app_emailtemplateconfig_change', args=[obj.pk]))
+        return redirect(reverse('admin:app_emailtemplateconfig_add'))
 
 
 @admin.register(DatasetUpload)

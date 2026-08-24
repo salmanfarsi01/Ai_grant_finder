@@ -6,7 +6,7 @@ from django.core.mail import EmailMessage
 from django.conf import settings
 from django.utils import timezone
 
-from .models import ScholarshipApplicant, SiteConfig, DatasetUpload
+from .models import ScholarshipApplicant, EmailTemplateConfig, DatasetUpload
 from app.embed1 import update_pinecone_embeddings
 
 
@@ -32,10 +32,10 @@ def handle_application_save(sender, instance, created, **kwargs):
         language = language if language in ('en', 'sv') else 'en'
 
         # Use SiteConfig if available for subject/body overrides
-        site_config = getattr(settings, 'SITE_CONFIG', None) or SiteConfig.objects.first()
-        if site_config:
-            subject = site_config.get_report_email_subject(language)
-            body = site_config.get_report_email_body(language)
+        email_config = EmailTemplateConfig.objects.first()
+        if email_config:
+            subject = email_config.get_report_email_subject(language)
+            body = email_config.get_report_email_body(language)
         else:
             if language == 'sv':
                 subject = "Din stipendierapport är klar"
